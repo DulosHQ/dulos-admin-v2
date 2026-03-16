@@ -49,19 +49,22 @@ export default function AdminPage() {
     <div className="min-h-screen bg-[#f8f6f6] p-6 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Administración</h1>
 
-      <div className="flex gap-6 border-b mb-6">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`pb-3 px-1 font-medium transition-colors ${
-              activeTab === tab ? 'border-b-2' : 'text-gray-500 hover:text-gray-700'
-            }`}
-            style={activeTab === tab ? { borderColor: ACCENT, color: ACCENT } : {}}
-          >
-            {tab}
-          </button>
-        ))}
+      <div className="border-b border-gray-200 mb-6">
+        <div className="flex gap-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-5 py-3 text-sm font-medium whitespace-nowrap transition-all border-b-[3px] cursor-pointer ${
+                activeTab === tab
+                  ? 'text-[#E63946] border-[#E63946]'
+                  : 'text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
       </div>
 
       {activeTab === 'Equipo' && <EquipoTab />}
@@ -125,7 +128,7 @@ function RolesTab() {
           </div>
           <p className="text-gray-600">{rol.permisos} permisos asignados</p>
           {expanded === rol.nombre && (
-            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {Object.entries(permisosDetalle[rol.nombre] || {}).map(([cat, perms]) => (
                 <div key={cat} className="bg-[#f8f6f6] rounded-lg p-3">
                   <p className="font-medium text-sm mb-1" style={{ color: ACCENT }}>{cat}</p>

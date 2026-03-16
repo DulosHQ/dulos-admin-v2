@@ -62,15 +62,15 @@ export default function OpsPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Operaciones</h1>
 
         <div className="border-b border-gray-200 mb-6">
-          <nav className="flex gap-8">
+          <nav className="flex gap-1">
             {tabs.map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`pb-3 text-sm font-medium ${
+                className={`px-5 py-3 text-sm font-medium whitespace-nowrap transition-all border-b-[3px] cursor-pointer ${
                   activeTab === tab
-                    ? 'border-b-2 border-[#E63946] text-[#E63946]'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'text-[#E63946] border-[#E63946]'
+                    : 'text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300'
                 }`}
               >
                 {tab}
@@ -104,7 +104,7 @@ export default function OpsPage() {
                     alert('Tu navegador no soporta acceso a la cámara');
                   }
                 }}
-                className="px-4 py-2 bg-[#E63946] text-white rounded-lg font-medium hover:bg-[#c5303c] transition-colors"
+                className="px-4 py-2 text-[#E63946] border-b-[3px] border-[#E63946] font-medium hover:bg-[#c5303c] transition-colors"
               >
                 Activar Cámara
               </button>
@@ -135,7 +135,7 @@ export default function OpsPage() {
         {activeTab === 'Historial' && (
           <div className="space-y-6">
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-gray-200 flex gap-4">
+              <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4">
                 <select
                   value={filtroEvento}
                   onChange={e => setFiltroEvento(e.target.value)}
@@ -181,7 +181,7 @@ export default function OpsPage() {
             </div>
             <div>
               <h3 className="text-lg font-bold mb-4">Reportes de Acceso</h3>
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white rounded-xl p-6 shadow-sm">
                   <h4 className="font-semibold text-gray-900 mb-4">Check-ins por Hora</h4>
                   {[{ h: '18:00', v: 45 }, { h: '19:00', v: 120 }, { h: '20:00', v: 89 }, { h: '21:00', v: 156 }, { h: '22:00', v: 34 }].map(d => (
@@ -205,7 +205,7 @@ export default function OpsPage() {
               </div>
               <div className="bg-white rounded-xl p-6 shadow-sm mt-6">
                 <h4 className="font-semibold text-gray-900 mb-4">Top Operadores</h4>
-                <div className="flex gap-8">
+                <div className="flex flex-col md:flex-row gap-4 md:gap-8">
                   {[{ n: 'Juan Pérez', c: 89 }, { n: 'Ana López', c: 76 }, { n: 'Carlos Ruiz', c: 64 }].map(o => (
                     <div key={o.n} className="text-center"><p className="font-medium text-gray-900">{o.n}</p><p className="text-sm text-gray-500">{o.c} check-ins</p></div>
                   ))}

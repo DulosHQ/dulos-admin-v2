@@ -129,22 +129,22 @@ export default function FinancePage() {
           </div>
           <button
             onClick={exportCSV}
-            className="px-4 py-2 bg-[#E63946] text-white rounded-lg font-medium hover:bg-[#c5303c] transition-colors"
+            className="px-4 py-2 text-[#E63946] border-b-[3px] border-[#E63946] font-medium hover:bg-[#c5303c] transition-colors"
           >
             Exportar CSV
           </button>
         </header>
 
-        <nav className="mb-6">
-          <div className="flex gap-1 bg-white rounded-lg p-1 shadow-sm w-fit">
+        <nav className="mb-6 border-b border-gray-200">
+          <div className="flex gap-1">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`px-6 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                className={`px-5 py-3 text-sm font-medium whitespace-nowrap transition-all border-b-[3px] cursor-pointer ${
                   activeTab === tab.key
-                    ? 'bg-[#E63946] text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    ? 'text-[#E63946] border-[#E63946]'
+                    : 'text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300'
                 }`}
               >
                 {tab.label}
@@ -213,7 +213,7 @@ export default function FinancePage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   Estadísticas de Capacidad
                 </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="text-center p-4 bg-red-50 rounded-lg">
                     <p className="text-3xl font-bold text-[#E63946]">5</p>
                     <p className="text-sm text-gray-600">Eventos Críticos</p>
