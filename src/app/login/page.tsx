@@ -63,15 +63,20 @@ function LoginForm() {
   // Check if already logged in on mount
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await getSupabase().auth.getSession();
-      if (session?.user?.email) {
-        const result = await validateTeamMember(session.user.email);
-        if (result.valid) {
-          router.push("/");
-          return;
+      try {
+        const { data: { session } } = await getSupabase().auth.getSession();
+        if (session?.user?.email) {
+          const result = await validateTeamMember(session.user.email);
+          if (result.valid) {
+            router.push("/");
+            return;
+          }
         }
+      } catch (e) {
+        console.error("Session check failed:", e);
+      } finally {
+        setCheckingSession(false);
       }
-      setCheckingSession(false);
     };
     checkSession();
   }, [router]);
