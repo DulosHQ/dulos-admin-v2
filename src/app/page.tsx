@@ -18,69 +18,27 @@ export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("resumen");
   const [loading, setLoading] = useState(true);
-  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     const checkSession = async () => {
-      // Primero verificar sesión de Supabase
       const { data: { session } } = await supabase.auth.getSession();
-
-      if (session?.user?.email) {
-        // Buscar el email en dulos_team
-        const { data: teamMember, error } = await supabase
-          .from("dulos_team")
-          .select("*")
-          .eq("email", session.user.email)
-          .eq("activo", true)
-          .single();
-
-        if (teamMember && !error) {
-          const userData = {
-            email: teamMember.email,
-            name: teamMember.nombre,
-            role: teamMember.rol,
-            permissions: teamMember.permisos || [],
-          };
-          localStorage.setItem("dulos_user", JSON.stringify(userData));
-          setUser(userData);
-          setLoading(false);
-          return;
-        } else {
-          // Usuario autenticado pero no tiene acceso
-          setAuthError("No tienes acceso al sistema");
-          await supabase.auth.signOut();
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Si no hay sesión de Supabase, verificar localStorage
-      const stored = localStorage.getItem("dulos_user");
-      if (stored) {
-        setUser(JSON.parse(stored));
+      if (session?.user) {
+        const stored = localStorage.getItem("dulos_user");
+        if (stored) setUser(JSON.parse(stored));
       }
       setLoading(false);
     };
-
     checkSession();
   }, []);
 
   if (loading) return <div className="min-h-screen bg-[#050505]" />;
 
   if (!user) {
-    return (
-      <LoginPage
-        onLogin={(u: any) => {
-          localStorage.setItem("dulos_user", JSON.stringify(u));
-          setAuthError(null);
-          setUser(u);
-        }}
-        authError={authError}
-      />
-    );
+    return <LoginPage onLogin={(u: any) => { localStorage.setItem("dulos_user", JSON.stringify(u)); setUser(u); }} />;
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     localStorage.removeItem("dulos_user");
     setUser(null);
   };
@@ -97,12 +55,7 @@ export default function Home() {
   };
 
   return (
-    <AdminShell
-      user={user}
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
-      onLogout={handleLogout}
-    >
+    <AdminShell user={user} activeTab={activeTab} onTabChange={setActiveTab} onLogout={handleLogout}>
       {renderPage()}
     </AdminShell>
   );
