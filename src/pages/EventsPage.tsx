@@ -140,10 +140,10 @@ export default function EventsPage() {
     async function loadData() {
       try {
         const [events, zones, orders, schedules] = await Promise.all([
-          fetchAllEvents(),
-          fetchZones(),
-          fetchAllOrders(),
-          fetchSchedules(),
+          fetchAllEvents().catch(() => []),
+          fetchZones().catch(() => []),
+          fetchAllOrders().catch(() => []),
+          fetchSchedules().catch(() => []),
         ]);
 
         // Group events by name (project)

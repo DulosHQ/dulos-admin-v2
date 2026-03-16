@@ -156,12 +156,12 @@ export default function SummaryPage() {
     async function loadData() {
       try {
         const [events, zones, orders, customers, checkins, escalations] = await Promise.all([
-          fetchEvents(),
-          fetchZones(),
-          fetchOrders(),
-          fetchCustomers(),
-          fetchCheckins(),
-          fetchEscalations(),
+          fetchEvents().catch(() => [] as DulosEvent[]),
+          fetchZones().catch(() => [] as TicketZone[]),
+          fetchOrders().catch(() => [] as Order[]),
+          fetchCustomers().catch(() => [] as Customer[]),
+          fetchCheckins().catch(() => [] as Checkin[]),
+          fetchEscalations().catch(() => [] as Escalation[]),
         ]);
 
         // Calculate metrics from real data

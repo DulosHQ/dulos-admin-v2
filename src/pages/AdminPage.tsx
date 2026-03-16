@@ -75,8 +75,8 @@ export default function AdminPage() {
     async function loadData() {
       try {
         const [teamData, auditData] = await Promise.all([
-          fetchTeam(),
-          fetchAuditLogs(),
+          fetchTeam().catch(() => []),
+          fetchAuditLogs().catch(() => []),
         ]);
 
         // Map team members to display format
