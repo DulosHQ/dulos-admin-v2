@@ -323,3 +323,142 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
     throw error;
   }
 }
+
+// New functions for enhanced features
+
+export async function fetchTicketsByEvent(eventId: string): Promise<Ticket[]> {
+  try {
+    return await supabaseFetch<Ticket[]>(`dulos_tickets?event_id=eq.${eventId}&order=created_at.desc`);
+  } catch (error) {
+    console.error('Error fetching tickets by event:', error);
+    throw error;
+  }
+}
+
+export async function fetchCustomersFromTickets(): Promise<Customer[]> {
+  try {
+    // Since dulos_customers table doesn't exist, derive from dulos_tickets
+    const tickets = await supabaseFetch<Ticket[]>('dulos_tickets');
+    const customerMap = new Map<string, Customer>();
+    
+    tickets.forEach(ticket => {
+      const email = ticket.customer_email;
+      if (!customerMap.has(email)) {
+        customerMap.set(email, {
+          id: email,
+          name: ticket.customer_name,
+          email: ticket.customer_email,
+          total_spent: 0,
+          total_orders: 0,
+          created_at: ticket.created_at,
+        });
+      }
+      
+      const customer = customerMap.get(email)!;
+      customer.total_orders += 1;
+      // Note: total_price not available in tickets, would need to calculate from zones
+    });
+
+    return Array.from(customerMap.values()).sort((a, b) => b.total_orders - a.total_orders);
+  } catch (error) {
+    console.error('Error fetching customers:', error);
+    throw error;
+  }
+}
+
+export async function fetchTransactionHistory(): Promise<Ticket[]> {
+  try {
+    return await supabaseFetch<Ticket[]>('dulos_tickets?order=created_at.desc&limit=100');
+  } catch (error) {
+    console.error('Error fetching transactions:', error);
+    throw error;
+  }
+}
+
+export async function fetchNotificationLogs(): Promise<AuditLog[]> {
+  try {
+    // Filter audit logs for notification-related actions
+    return await supabaseFetch<AuditLog[]>('dulos_audit_logs?action=ilike.*notification*&order=created_at.desc&limit=50');
+  } catch (error) {
+    console.error('Error fetching notification logs:', error);
+    throw error;
+  }
+}
+
+export async function searchCustomerByNameOrEmail(query: string): Promise<Customer[]> {
+  try {
+    // Search across dulos_tickets since customer table doesn't exist
+    const tickets = await supabaseFetch<Ticket[]>(`dulos_tickets?or=(customer_name.ilike.*${query}*,customer_email.ilike.*${query}*)&order=created_at.desc`);
+    
+    // Deduplicate by email and aggregate
+    const customerMap = new Map<string, Customer & { tickets: Ticket[] }>();
+    
+    tickets.forEach(ticket => {
+      const email = ticket.customer_email;
+      if (!customerMap.has(email)) {
+        customerMap.set(email, {
+          id: email,
+          name: ticket.customer_name,
+          email: ticket.customer_email,
+          total_spent: 0,
+          total_orders: 0,
+          created_at: ticket.created_at,
+          tickets: [],
+        });
+      }
+      
+      const customer = customerMap.get(email)!;
+      customer.tickets.push(ticket);
+      customer.total_orders = customer.tickets.length;
+    });
+
+    return Array.from(customerMap.values()).slice(0, 20);
+  } catch (error) {
+    console.error('Error searching customers:', error);
+    throw error;
+  }
+}
+
+export async function fetchRevenueByEvent(): Promise<{ event_id: string; event_name: string; revenue: number; image_url?: string }[]> {
+  try {
+    const [events, zones] = await Promise.all([
+      fetchAllEvents(),
+      fetchZones(),
+    ]);
+
+    const eventMap = new Map(events.map(e => [e.id, e]));
+    const revenueByEvent = new Map<string, number>();
+
+    zones.forEach(zone => {
+      const current = revenueByEvent.get(zone.event_id) || 0;
+      revenueByEvent.set(zone.event_id, current + (zone.sold * zone.price));
+    });
+
+    return Array.from(revenueByEvent.entries())
+      .map(([eventId, revenue]) => {
+        const event = eventMap.get(eventId);
+        return {
+          event_id: eventId,
+          event_name: event?.name || eventId,
+          revenue,
+          image_url: event?.image_url,
+        };
+      })
+      .sort((a, b) => b.revenue - a.revenue);
+  } catch (error) {
+    console.error('Error fetching revenue by event:', error);
+    throw error;
+  }
+}
+
+export async function fetchAuditLogsByAction(actionFilter?: string): Promise<AuditLog[]> {
+  try {
+    const endpoint = actionFilter 
+      ? `dulos_audit_logs?action=ilike.*${actionFilter}*&order=created_at.desc&limit=100`
+      : 'dulos_audit_logs?order=created_at.desc&limit=100';
+    return await supabaseFetch<AuditLog[]>(endpoint);
+  } catch (error) {
+    console.error('Error fetching filtered audit logs:', error);
+    throw error;
+  }
+}
