@@ -213,21 +213,19 @@ export default function SummaryPage() {
             {funcionesProximas.map((f) => {
               const hasAlert = alertas.some(a => a.mensaje.toLowerCase().includes(f.nombre.toLowerCase()));
               return (
-                <div key={f.id} className={`flex items-stretch gap-3 p-2 rounded-xl border transition-all hover:shadow-sm ${hasAlert ? 'border-red-200 bg-red-50/30' : 'border-gray-100 bg-white'}`}>
-                  <div className="flex items-center flex-shrink-0">
-                    {f.image_url ? (
-                      <img src={f.image_url} alt="" className="w-[68px] h-[68px] rounded-xl object-cover shadow-sm" />
-                    ) : (
-                      <div className="w-[68px] h-[68px] rounded-xl bg-gray-100 flex items-center justify-center text-2xl">🎭</div>
-                    )}
-                  </div>
+                <div key={f.id} className={`flex gap-3 p-3 rounded-xl border transition-all hover:shadow-sm ${hasAlert ? 'border-red-200 bg-red-50/30' : 'border-gray-100 bg-white'}`}>
+                  {f.image_url ? (
+                    <img src={f.image_url} alt="" className="w-16 h-16 rounded-xl object-cover shadow-sm flex-shrink-0 self-center" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl bg-gray-100 flex items-center justify-center text-2xl flex-shrink-0 self-center">🎭</div>
+                  )}
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-bold text-gray-900 text-sm truncate leading-tight">{f.nombre}</p>
-                      <span className={`text-sm font-extrabold flex-shrink-0 ${f.ocupacion >= 80 ? 'text-red-500' : f.ocupacion >= 50 ? 'text-amber-500' : 'text-gray-300'}`}>{f.ocupacion}%</span>
+                      <p className="font-extrabold text-gray-900 text-[13px] truncate leading-tight">{f.nombre}</p>
+                      <span className={`text-[13px] font-black flex-shrink-0 ${f.ocupacion >= 80 ? 'text-red-500' : f.ocupacion >= 50 ? 'text-amber-500' : 'text-gray-300'}`}>{f.ocupacion}%</span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5 truncate">{f.hora} · {f.sala}</p>
-                    <p className={`text-xs font-semibold mt-0.5 ${f.available < 50 ? 'text-red-500' : 'text-emerald-600'}`}>{f.available} disponibles</p>
+                    <p className="text-[12px] text-gray-500 mt-1 truncate font-medium">{f.hora} · {f.sala}</p>
+                    <p className={`text-[12px] font-bold mt-0.5 ${f.available < 50 ? 'text-red-500' : 'text-emerald-600'}`}>{f.available} disponibles</p>
                   </div>
                 </div>
               );
@@ -246,10 +244,10 @@ export default function SummaryPage() {
             </div>
             <div className="divide-y divide-gray-50">
               {actividadReciente.map((a) => (
-                <div key={a.id} className="flex items-center gap-2 px-3 py-1.5">
+                <div key={a.id} className="flex items-center gap-2 px-3 py-2">
                   <span className="text-sm">{getActividadEmoji(a.tipo)}</span>
-                  <p className="flex-1 text-sm text-gray-700 truncate">{a.mensaje}</p>
-                  <span className="text-xs text-gray-400 tabular-nums">{a.tiempo}</span>
+                  <p className="flex-1 text-[13px] text-gray-700 truncate font-medium">{a.mensaje}</p>
+                  <span className="text-[12px] text-gray-400 tabular-nums font-semibold">{a.tiempo}</span>
                 </div>
               ))}
             </div>

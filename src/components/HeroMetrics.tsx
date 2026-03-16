@@ -91,12 +91,10 @@ const DEFAULT_ICON = (
 );
 
 function MetricCard({ metric }: { metric: MetricData }) {
-  const icon = METRIC_ICONS[metric.label] || DEFAULT_ICON;
-
   return (
-    <div className="metric-card group text-center">
-      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{metric.label}</p>
-      <p className="text-2xl font-extrabold text-gray-900 tracking-tight leading-none mt-2">{metric.value}</p>
+    <div className="bg-white rounded-lg border border-gray-200 p-4 text-center" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{metric.label}</p>
+      <p className="text-3xl font-black text-gray-900 tracking-tight mt-2 leading-none">{metric.value}</p>
     </div>
   );
 }
