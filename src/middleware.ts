@@ -52,6 +52,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
+  // HARDLOCK: Only allow specific emails - checked BEFORE dulos_team
+  const ALLOWED_EMAILS = ["angel.lopez@vulkn-ai.com"];
+
+  if (!ALLOWED_EMAILS.includes(user.email!.toLowerCase())) {
+    return NextResponse.redirect(new URL("/login?error=unauthorized", request.url));
+  }
+
   // User is authenticated - now verify they're in dulos_team
   try {
     const teamCheckResponse = await fetch(

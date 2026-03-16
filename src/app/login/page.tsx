@@ -12,6 +12,11 @@ function getSupabase() {
 }
 
 async function validateTeamMember(email: string): Promise<{ valid: boolean; error?: string }> {
+  // HARDLOCK: Only allow specific email
+  if (email.toLowerCase() !== "angel.lopez@vulkn-ai.com") {
+    return { valid: false, error: "Acceso denegado." };
+  }
+
   try {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/dulos_team?email=eq.${encodeURIComponent(email)}&select=email,is_active`,
