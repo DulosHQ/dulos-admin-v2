@@ -205,7 +205,7 @@ export default function SummaryPage() {
       {/* Funciones Próximas */}
       <div className="section-card">
         <div className="section-card-header !py-2 !px-3">
-          <span className="font-bold text-gray-900 text-sm">🎭 Funciones Próximas</span>
+          <span className="font-bold text-gray-900 text-sm">Funciones Próximas</span>
           {alertas.length > 0 && <span className="badge badge-error ml-auto text-xs">{alertas.length} alertas</span>}
         </div>
         {funcionesProximas.length > 0 && (
@@ -213,13 +213,13 @@ export default function SummaryPage() {
             {funcionesProximas.map((f) => {
               const hasAlert = alertas.some(a => a.mensaje.toLowerCase().includes(f.nombre.toLowerCase()));
               return (
-                <div key={f.id} className={`flex gap-3 p-3 rounded-xl border transition-all hover:shadow-sm ${hasAlert ? 'border-red-200 bg-red-50/30' : 'border-gray-100 bg-white'}`}>
+                <div key={f.id} className={`flex gap-0 rounded-xl border overflow-hidden transition-all hover:shadow-sm ${hasAlert ? 'border-red-200 bg-red-50/30' : 'border-gray-100 bg-white'}`}>
                   {f.image_url ? (
-                    <img src={f.image_url} alt="" className="w-16 h-16 rounded-xl object-cover shadow-sm flex-shrink-0 self-center" />
+                    <img src={f.image_url} alt="" className="w-20 object-cover flex-shrink-0" />
                   ) : (
-                    <div className="w-16 h-16 rounded-xl bg-gray-100 flex items-center justify-center text-2xl flex-shrink-0 self-center">🎭</div>
+                    <div className="w-20 bg-gray-100 flex items-center justify-center flex-shrink-0">🎭</div>
                   )}
-                  <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <div className="flex-1 min-w-0 flex flex-col justify-center py-2.5 px-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-extrabold text-gray-900 text-[13px] truncate leading-tight">{f.nombre}</p>
                       <span className={`text-[13px] font-black flex-shrink-0 ${f.ocupacion >= 80 ? 'text-red-500' : f.ocupacion >= 50 ? 'text-amber-500' : 'text-gray-300'}`}>{f.ocupacion}%</span>
@@ -240,12 +240,12 @@ export default function SummaryPage() {
         {actividadReciente.length > 0 && (
           <div className="section-card">
             <div className="section-card-header !py-2 !px-3">
-              <span className="font-bold text-gray-900 text-sm">⚡ Actividad Reciente</span>
+              <span className="font-bold text-gray-900 text-sm">Actividad Reciente</span>
             </div>
             <div className="divide-y divide-gray-50">
               {actividadReciente.map((a) => (
                 <div key={a.id} className="flex items-center gap-2 px-3 py-2">
-                  <span className="text-sm">{getActividadEmoji(a.tipo)}</span>
+                  
                   <p className="flex-1 text-[13px] text-gray-700 truncate font-medium">{a.mensaje}</p>
                   <span className="text-[12px] text-gray-400 tabular-nums font-semibold">{a.tiempo}</span>
                 </div>
@@ -258,7 +258,7 @@ export default function SummaryPage() {
         {boletosRecientes.length > 0 && (
           <div className="section-card">
             <div className="section-card-header !py-2 !px-3">
-              <span className="font-bold text-gray-900 text-sm">🎫 Boletos Vendidos</span>
+              <span className="font-bold text-gray-900 text-sm">Boletos Vendidos</span>
             </div>
             <table className="w-full text-sm">
               <thead>
