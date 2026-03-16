@@ -347,26 +347,26 @@ export default function SummaryPage() {
         upcoming={metrics.upcoming}
       />
 
-      {/* Alertas Section - Cellosa style card */}
+      {/* Alertas Section - compact */}
       {alertas.length > 0 && (
         <div className="section-card">
-          <div className="section-card-header">
+          <div className="section-card-header !py-3">
             <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            <span className="section-card-title">Alertas Activas</span>
+            <span className="section-card-title">Alertas</span>
             <span className="badge badge-error ml-auto">{alertas.filter(a => a.tipo === 'critico').length} críticas</span>
           </div>
-          <div className="section-card-body">
-            <div className="space-y-2">
+          <div className="px-4 py-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
               {alertas.map((alerta) => (
-                <div key={alerta.id} className={`flex items-center gap-3 py-2 px-3 rounded-lg ${
+                <div key={alerta.id} className={`flex items-center gap-2 py-1.5 px-2.5 rounded-md text-xs ${
                   alerta.tipo === "critico" ? "bg-red-50" : alerta.tipo === "warning" ? "bg-amber-50" : "bg-blue-50"
                 }`}>
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                     alerta.tipo === "critico" ? "bg-red-500" : alerta.tipo === "warning" ? "bg-amber-500" : "bg-blue-500"
                   }`} />
-                  <span className="text-sm text-gray-700">{alerta.mensaje}</span>
+                  <span className="text-gray-700 truncate">{alerta.mensaje}</span>
                 </div>
               ))}
             </div>
@@ -376,130 +376,102 @@ export default function SummaryPage() {
 
       {/* Two-column layout for Funciones and Actividad */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Funciones Próximas - CLK style table */}
-        <div className="section-card">
-          <div className="section-card-header">
+        {/* Funciones Próximas - compact list */}
+        <div className="section-card flex flex-col">
+          <div className="section-card-header !py-3">
             <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             <span className="section-card-title">Funciones Próximas</span>
           </div>
-          <div className="overflow-hidden">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Evento</th>
-                  <th>Horario</th>
-                  <th>Ocupación</th>
-                </tr>
-              </thead>
-              <tbody>
-                {funcionesProximas.map((funcion) => (
-                  <tr key={funcion.id}>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        {funcion.image_url && (
-                          <img src={funcion.image_url} alt="" className="w-8 h-8 rounded object-cover" />
-                        )}
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">{funcion.nombre}</p>
-                          <p className="text-xs text-gray-500">{funcion.sala}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="text-sm">{funcion.hora}</td>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full ${getOcupacionColor(funcion.ocupacion)} rounded-full`}
-                            style={{ width: `${funcion.ocupacion}%` }}
-                          />
-                        </div>
-                        <span className={`text-xs font-medium ${funcion.ocupacion >= 80 ? 'pct-negative' : 'text-gray-600'}`}>
-                          {funcion.ocupacion}%
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="flex-1 divide-y divide-gray-100">
+            {funcionesProximas.map((funcion) => (
+              <div key={funcion.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+                {funcion.image_url ? (
+                  <img src={funcion.image_url} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-gray-400 text-xs">🎭</span>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900 text-sm truncate">{funcion.nombre}</p>
+                  <p className="text-xs text-gray-500">{funcion.hora} · {funcion.sala}</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="w-14 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${getOcupacionColor(funcion.ocupacion)} rounded-full`}
+                      style={{ width: `${funcion.ocupacion}%` }}
+                    />
+                  </div>
+                  <span className={`text-xs font-semibold w-8 text-right ${funcion.ocupacion >= 80 ? 'text-red-500' : 'text-gray-600'}`}>
+                    {funcion.ocupacion}%
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Actividad Reciente */}
-        <div className="section-card">
-          <div className="section-card-header">
+        {/* Actividad Reciente - match height */}
+        <div className="section-card flex flex-col">
+          <div className="section-card-header !py-3">
             <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
             <span className="section-card-title">Actividad Reciente</span>
           </div>
-          <div className="section-card-body">
-            <div className="space-y-3">
-              {actividadReciente.map((actividad) => (
-                <div key={actividad.id} className="flex items-center gap-3">
-                  <span className="text-base flex-shrink-0">{getActividadEmoji(actividad.tipo)}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-700 truncate">{actividad.mensaje}</p>
-                  </div>
-                  <span className="text-xs text-gray-400 flex-shrink-0">{actividad.tiempo}</span>
+          <div className="flex-1 divide-y divide-gray-50">
+            {actividadReciente.map((actividad) => (
+              <div key={actividad.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                <span className="text-sm flex-shrink-0">{getActividadEmoji(actividad.tipo)}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-700 truncate">{actividad.mensaje}</p>
                 </div>
-              ))}
-            </div>
+                <span className="text-xs text-gray-400 flex-shrink-0 tabular-nums">{actividad.tiempo}</span>
+              </div>
+            ))}
+            {actividadReciente.length === 0 && (
+              <div className="flex-1 flex items-center justify-center py-8 text-gray-400 text-sm">
+                Sin actividad reciente
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Clientes Recientes - Cellosa style table */}
-      <div className="section-card">
-        <div className="section-card-header">
+      {/* Clientes Recientes - card grid instead of table */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
           <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
-          <span className="section-card-title">Clientes Recientes</span>
-        </div>
-        <div className="overflow-hidden">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>Órdenes</th>
-                <th>Total Gastado</th>
-                <th>Boletos</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {clientes.map((cliente) => (
-                <tr key={cliente.id}>
-                  <td>
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#E63946] flex items-center justify-center text-white text-sm font-semibold">
-                        {cliente.nombre.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900 text-sm">{cliente.nombre}</p>
-                        <p className="text-xs text-gray-500">{cliente.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="text-sm">{cliente.ordenes}</td>
-                  <td className="text-sm font-medium">${cliente.gastado.toLocaleString()}</td>
-                  <td className="text-sm">{cliente.boletos}</td>
-                  <td>
-                    <button
-                      onClick={() => alert(`Detalle de ${cliente.nombre}`)}
-                      className="text-sm text-[#E63946] hover:underline"
-                    >
-                      Ver detalle
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          Clientes Recientes
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {clientes.map((cliente) => (
+            <div key={cliente.id} className="section-card p-4 hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-[#E63946] flex items-center justify-center text-white font-semibold">
+                  {cliente.nombre.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm truncate">{cliente.nombre}</p>
+                  <p className="text-xs text-gray-500 truncate">{cliente.email}</p>
+                </div>
+              </div>
+              <div className="text-xs text-gray-600">
+                {cliente.ordenes} órdenes · ${cliente.gastado.toLocaleString()} gastado · {cliente.boletos} boletos
+              </div>
+              <button
+                onClick={() => alert(`Detalle de ${cliente.nombre}`)}
+                className="text-xs text-[#E63946] hover:underline mt-2 font-medium"
+              >
+                Ver detalle
+              </button>
+            </div>
+          ))}
         </div>
       </div>
     </div>
