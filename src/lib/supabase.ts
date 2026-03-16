@@ -61,20 +61,27 @@ export interface Customer {
 export interface Schedule {
   id: string;
   event_id: string;
-  title: string;
+  date: string;
   start_time: string;
   end_time: string;
-  stage?: string;
+  total_capacity: number;
+  sold_capacity: number;
+  reserved_capacity: number;
+  status: string;
+  created_at: string;
 }
 
 export interface Ticket {
   id: string;
   order_id: string;
+  ticket_number: string;
   event_id: string;
   zone_name: string;
-  ticket_code: string;
   status: string;
+  customer_name: string;
+  customer_email: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface Coupon {
@@ -82,26 +89,35 @@ export interface Coupon {
   code: string;
   discount_type: string;
   discount_value: number;
-  uses: number;
+  used_count: number;
   max_uses?: number;
-  expires_at?: string;
+  is_active: boolean;
+  valid_from?: string;
+  valid_until?: string;
+  event_id?: string;
   created_at: string;
 }
 
 export interface Checkin {
   id: string;
-  ticket_id: string;
-  event_id: string;
+  ticket_id: string | null;
+  ticket_number: string;
+  customer_name: string;
+  event_name: string;
+  venue: string;
   operator_name: string;
+  status: string;
   scanned_at: string;
 }
 
 export interface AuditLog {
   id: string;
-  user_id?: string;
+  user_email: string;
   action: string;
-  resource: string;
+  entity_type: string;
+  entity_id: string;
   details?: string;
+  ip_address?: string;
   created_at: string;
 }
 
@@ -152,7 +168,19 @@ export async function fetchZones(eventId?: string): Promise<TicketZone[]> {
 
 export async function fetchOrders(): Promise<Order[]> {
   try {
-    return await supabaseFetch<Order[]>('dulos_orders?order=purchased_at.desc');
+    // dulos_orders is empty, so we fetch from dulos_tickets and map to Order[]
+    const tickets = await supabaseFetch<Ticket[]>('dulos_tickets?order=created_at.desc&limit=50');
+    return tickets.map((ticket) => ({
+      order_number: ticket.order_id,
+      customer_name: ticket.customer_name,
+      customer_email: ticket.customer_email,
+      event_id: ticket.event_id,
+      zone_name: ticket.zone_name,
+      quantity: 1,
+      total_price: 0, // Not available from tickets
+      payment_status: ticket.status,
+      purchased_at: ticket.created_at,
+    }));
   } catch (error) {
     console.error('Error fetching orders:', error);
     throw error;
@@ -200,7 +228,7 @@ export async function fetchTickets(): Promise<Ticket[]> {
 
 export async function fetchCoupons(): Promise<Coupon[]> {
   try {
-    return await supabaseFetch<Coupon[]>('dulos_coupons?order=created_at.desc');
+    return await supabaseFetch<Coupon[]>('dulos_coupons?is_active=eq.true&order=created_at.desc');
   } catch (error) {
     console.error('Error fetching coupons:', error);
     throw error;
@@ -236,14 +264,17 @@ export async function fetchTeam(): Promise<TeamMember[]> {
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
   try {
-    const [events, orders, zones] = await Promise.all([
+    const [events, tickets, zones] = await Promise.all([
       fetchEvents(),
-      fetchOrders(),
+      supabaseFetch<Ticket[]>('dulos_tickets?select=id'),
       fetchZones(),
     ]);
 
-    const totalRevenue = orders.reduce((sum, order) => sum + order.total_price, 0);
-    const totalTickets = orders.reduce((sum, order) => sum + order.quantity, 0);
+    // Count total tickets from dulos_tickets
+    const totalTickets = tickets.length;
+
+    // Calculate revenue from zones (sold * price)
+    const totalRevenue = zones.reduce((sum, zone) => sum + (zone.sold * zone.price), 0);
     const totalEvents = events.length;
 
     const totalSold = zones.reduce((sum, zone) => sum + zone.sold, 0);

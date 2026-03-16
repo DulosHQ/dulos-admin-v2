@@ -276,11 +276,10 @@ export default function SummaryPage() {
         const actividades: Actividad[] = [];
 
         checkins.slice(0, 5).forEach((checkin) => {
-          const event = eventMap.get(checkin.event_id);
           actividades.push({
             id: `checkin-${checkin.id}`,
             tipo: 'checkin',
-            mensaje: `Check-in por ${checkin.operator_name} - ${event?.name || checkin.event_id}`,
+            mensaje: `Check-in: ${checkin.customer_name} - ${checkin.event_name}`,
             tiempo: formatTimeAgo(checkin.scanned_at),
           });
         });
@@ -290,7 +289,7 @@ export default function SummaryPage() {
           actividades.push({
             id: `order-${order.order_number}`,
             tipo: 'venta',
-            mensaje: `Venta de ${order.quantity} boletos - ${event?.name || order.event_id}`,
+            mensaje: `Venta: ${order.customer_name} - ${event?.name || order.event_id}`,
             tiempo: formatTimeAgo(order.purchased_at),
           });
         });
