@@ -14,35 +14,48 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkandhYnR5aGpjcnB5dWZmYXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1OTM5MzQsImV4cCI6MjA4OTE2OTkzNH0.5RxuCjEPKY2eLmSG8iwMVKJnczcBRNhQH1QADm68UW4"
 );
 
-const DEFAULT_PERMS = ["finance.read","finance.stats.global","event.read","project.read","project.manage","inventory.read","ticket.scan","marketing.codes.manage","team.manage","sys.config","sys.audit","access.stats"];
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  ADMIN: ["finance.read","finance.stats.global","event.read","event.write","project.read","project.manage","inventory.read","ticket.scan","marketing.codes.manage","team.manage","sys.config","sys.audit","access.stats"],
+  OPERADOR: ["finance.read","event.read","event.write","inventory.read","ticket.scan","marketing.codes.manage","project.read","project.manage","access.stats"],
+  PRODUCTOR: ["finance.read","event.read","project.read","inventory.read"],
+  TAQUILLERO: ["ticket.scan","ticket.checkin","inventory.read"],
+  SOPORTE: ["event.read","ticket.read","order.view.list"],
+};
 
-async function validateUser(email: string, name: string): Promise<{valid: boolean; user: any; error?: string}> {
+async function validateTeamMember(email: string): Promise<{ valid: boolean; user: any; error?: string }> {
   try {
     const res = await fetch(
-      `https://udjwabtyhjcrpyuffavz.supabase.co/rest/v1/dulos_team?email=eq.${encodeURIComponent(email)}&is_active=eq.true&select=*`,
+      `https://udjwabtyhjcrpyuffavz.supabase.co/rest/v1/dulos_team?email=eq.${encodeURIComponent(email)}&select=*`,
       {
         headers: {
-          "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkandhYnR5aGpjcnB5dWZmYXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1OTM5MzQsImV4cCI6MjA4OTE2OTkzNH0.5RxuCjEPKY2eLmSG8iwMVKJnczcBRNhQH1QADm68UW4",
-          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkandhYnR5aGpjcnB5dWZmYXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1OTM5MzQsImV4cCI6MjA4OTE2OTkzNH0.5RxuCjEPKY2eLmSG8iwMVKJnczcBRNhQH1QADm68UW4",
+          apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkandhYnR5aGpjcnB5dWZmYXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1OTM5MzQsImV4cCI6MjA4OTE2OTkzNH0.5RxuCjEPKY2eLmSG8iwMVKJnczcBRNhQH1QADm68UW4",
+          Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkandhYnR5aGpjcnB5dWZmYXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1OTM5MzQsImV4cCI6MjA4OTE2OTkzNH0.5RxuCjEPKY2eLmSG8iwMVKJnczcBRNhQH1QADm68UW4",
         },
       }
     );
     const team = await res.json();
-    
-    if (team && team.length > 0) {
-      return {
-        valid: true,
-        user: {
-          email: team[0].email,
-          name: team[0].name,
-          role: team[0].role,
-          permissions: DEFAULT_PERMS,
-        },
-      };
+
+    if (!team || team.length === 0) {
+      return { valid: false, user: null, error: "No tienes acceso al sistema. Contacta al administrador." };
     }
-    return { valid: false, user: null, error: "No tienes acceso. Contacta al administrador." };
+
+    const member = team[0];
+
+    if (!member.is_active) {
+      return { valid: false, user: null, error: "Tu cuenta ha sido desactivada." };
+    }
+
+    return {
+      valid: true,
+      user: {
+        email: member.email,
+        name: member.name,
+        role: member.role,
+        permissions: ROLE_PERMISSIONS[member.role] || [],
+      },
+    };
   } catch {
-    return { valid: false, user: null, error: "Error verificando acceso." };
+    return { valid: false, user: null, error: "Error de conexión. Intenta de nuevo." };
   }
 }
 
@@ -56,24 +69,32 @@ export default function Home() {
     let mounted = true;
 
     const init = async () => {
-      // 1. Check localStorage
+      // 1. Check localStorage for existing session
       const stored = localStorage.getItem("dulos_user");
       if (stored) {
-        if (mounted) { setUser(JSON.parse(stored)); setLoading(false); }
+        const parsed = JSON.parse(stored);
+        // Re-validate against dulos_team every time
+        const result = await validateTeamMember(parsed.email);
+        if (result.valid) {
+          if (mounted) { setUser(result.user); setLoading(false); }
+        } else {
+          // User was removed or deactivated — clear session
+          localStorage.removeItem("dulos_user");
+          await supabase.auth.signOut();
+          if (mounted) { setAuthError(result.error || "Sesión expirada"); setLoading(false); }
+        }
         return;
       }
 
       // 2. Check Supabase session (Google OAuth return)
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.email) {
-        const result = await validateUser(
-          session.user.email,
-          session.user.user_metadata?.full_name || session.user.email.split("@")[0]
-        );
+        const result = await validateTeamMember(session.user.email);
         if (result.valid) {
           localStorage.setItem("dulos_user", JSON.stringify(result.user));
           if (mounted) { setUser(result.user); setLoading(false); }
         } else {
+          // NOT authorized — sign out immediately
           await supabase.auth.signOut();
           if (mounted) { setAuthError(result.error || "Acceso denegado"); setLoading(false); }
         }
@@ -99,14 +120,17 @@ export default function Home() {
     return (
       <LoginPage
         onLogin={async (u: any) => {
-          // Validate against dulos_team
-          const result = await validateUser(u.email, u.name);
+          // ALWAYS validate against dulos_team — NO exceptions
+          const result = await validateTeamMember(u.email);
           if (result.valid) {
             localStorage.setItem("dulos_user", JSON.stringify(result.user));
             setUser(result.user);
+            setAuthError("");
           } else {
-            localStorage.setItem("dulos_user", JSON.stringify(u));
-            setUser(u);
+            // REJECT — not in dulos_team
+            await supabase.auth.signOut();
+            localStorage.removeItem("dulos_user");
+            setAuthError(result.error || "No tienes acceso al sistema.");
           }
         }}
         authError={authError}
