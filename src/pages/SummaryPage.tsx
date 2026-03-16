@@ -74,11 +74,11 @@ const mockAlertas: Alerta[] = [
 ];
 
 const mockFuncionesProximas = [
-  { id: 1, nombre: 'Romeo y Julieta', hora: '18:00', sala: 'Sala Principal', ocupacion: 95, image_url: '' },
-  { id: 2, nombre: 'El Fantasma de la Ópera', hora: '19:30', sala: 'Sala A', ocupacion: 78, image_url: '' },
-  { id: 3, nombre: 'Los Miserables', hora: '20:00', sala: 'Sala B', ocupacion: 45, image_url: '' },
-  { id: 4, nombre: 'Cats', hora: '20:30', sala: 'Sala Principal', ocupacion: 62, image_url: '' },
-  { id: 5, nombre: 'Chicago', hora: '21:00', sala: 'Sala C', ocupacion: 28, image_url: '' },
+  { id: 1, nombre: 'Romeo y Julieta', hora: '18:00', sala: 'Sala Principal', ocupacion: 95, available: 5, image_url: '' },
+  { id: 2, nombre: 'El Fantasma de la Ópera', hora: '19:30', sala: 'Sala A', ocupacion: 78, available: 22, image_url: '' },
+  { id: 3, nombre: 'Los Miserables', hora: '20:00', sala: 'Sala B', ocupacion: 45, available: 55, image_url: '' },
+  { id: 4, nombre: 'Cats', hora: '20:30', sala: 'Sala Principal', ocupacion: 62, available: 38, image_url: '' },
+  { id: 5, nombre: 'Chicago', hora: '21:00', sala: 'Sala C', ocupacion: 28, available: 72, image_url: '' },
 ];
 
 const mockActividadReciente = [
@@ -261,12 +261,15 @@ export default function SummaryPage() {
           const total = eventZones.reduce((s, z) => s + z.available + z.sold, 0);
           const ocupacion = total > 0 ? Math.round((sold / total) * 100) : 0;
 
+          const available = eventZones.reduce((s, z) => s + z.available, 0);
+
           return {
             id: idx + 1,
             nombre: event.name,
             hora: event.dates || 'TBD',
             sala: event.venue,
             ocupacion,
+            available,
             image_url: event.image_url || '',
           };
         });
@@ -376,6 +379,9 @@ export default function SummaryPage() {
                     <p className="font-semibold text-gray-900 text-sm truncate">{funcion.nombre}</p>
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">{funcion.hora} · {funcion.sala}</p>
+                  <p className={`text-xs mt-1 font-medium ${funcion.available < 50 ? 'text-red-500' : 'text-emerald-600'}`}>
+                    {funcion.available} boletos disponibles
+                  </p>
                 </div>
                 <span className={`text-sm font-bold flex-shrink-0 ${funcion.ocupacion >= 80 ? 'text-red-500' : funcion.ocupacion >= 50 ? 'text-amber-500' : 'text-gray-400'}`}>
                   {funcion.ocupacion}%
