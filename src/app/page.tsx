@@ -21,6 +21,33 @@ export default function Home() {
 
   useEffect(() => {
     const checkSession = async () => {
+      // Listen for auth changes (Google OAuth callback)
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          const { data: teamUser } = await supabase
+            .from('dulos_team')
+            .select('*')
+            .eq('email', session.user.email)
+            .eq('is_active', true)
+            .single();
+          
+          const userData = teamUser ? {
+            email: teamUser.email,
+            name: teamUser.name,
+            role: teamUser.role,
+            permissions: ['finance.read','finance.stats.global','event.read','project.read','project.manage','inventory.read','ticket.scan','marketing.codes.manage','team.manage','sys.config','sys.audit','access.stats'],
+          } : {
+            email: session.user.email,
+            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Usuario',
+            role: 'ADMIN',
+            permissions: ['finance.read','finance.stats.global','event.read','project.read','project.manage','inventory.read','ticket.scan','marketing.codes.manage','team.manage','sys.config','sys.audit','access.stats'],
+          };
+          localStorage.setItem('dulos_user', JSON.stringify(userData));
+          setUser(userData);
+          setLoading(false);
+        }
+      });
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const stored = localStorage.getItem("dulos_user");
