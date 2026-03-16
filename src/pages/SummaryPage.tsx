@@ -188,9 +188,9 @@ export default function SummaryPage() {
               return (
                 <div key={f.id} className={`flex items-center gap-2 p-2 rounded-lg border ${hasAlert ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
                   {f.image_url ? (
-                    <img src={f.image_url} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                    <img src={f.image_url} alt="" className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
                   ) : (
-                    <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-sm">🎭</div>
+                    <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-sm">🎭</div>
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-900 text-xs truncate">{f.nombre}</p>
