@@ -75,6 +75,7 @@ export interface Ticket {
   id: string;
   order_id: string;
   ticket_number: string;
+  ticket_token: string;
   event_id: string;
   zone_name: string;
   status: string;

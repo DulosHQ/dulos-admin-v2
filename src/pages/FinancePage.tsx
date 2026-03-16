@@ -9,6 +9,8 @@ import {
   fetchAllOrders,
   fetchSchedules,
   fetchAllEvents,
+  fetchTickets,
+  DulosEvent,
 } from '../lib/supabase';
 
 type TabKey = 'ingresos' | 'capacidad' | 'tendencias';
@@ -85,11 +87,12 @@ export default function FinancePage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [zones, orders, schedulesData, events] = await Promise.all([
-          fetchZones(),
-          fetchAllOrders(),
-          fetchSchedules(),
-          fetchAllEvents(),
+        const [zones, orders, schedulesData, events, tickets] = await Promise.all([
+          fetchZones().catch(() => []),
+          fetchAllOrders().catch(() => []),
+          fetchSchedules().catch(() => []),
+          fetchAllEvents().catch(() => []),
+          fetchTickets().catch(() => []),
         ]);
 
         // Create event lookup

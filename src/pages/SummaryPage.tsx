@@ -8,11 +8,13 @@ import {
   fetchOrders,
   fetchCheckins,
   fetchEscalations,
+  fetchTickets,
   DulosEvent,
   TicketZone,
   Order,
   Checkin,
   Escalation,
+  Ticket,
 } from '../lib/supabase';
 
 interface Alerta {
@@ -77,16 +79,18 @@ export default function SummaryPage() {
   const [funcionesProximas, setFuncionesProximas] = useState<{ id: number; nombre: string; hora: string; sala: string; ocupacion: number; available: number; image_url: string }[]>([]);
   const [actividadReciente, setActividadReciente] = useState<Actividad[]>([]);
   const [ventasRecientes, setVentasRecientes] = useState<{ id: string; cliente: string; evento: string; zona: string; total: number; fecha: string }[]>([]);
+  const [boletosRecientes, setBoletosRecientes] = useState<{ id: string; ticket: string; cliente: string; evento: string; zona: string; status: string; fecha: string }[]>([]);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [events, zones, orders, checkins, escalations] = await Promise.all([
+        const [events, zones, orders, checkins, escalations, tickets] = await Promise.all([
           fetchEvents().catch(() => [] as DulosEvent[]),
           fetchZones().catch(() => [] as TicketZone[]),
           fetchOrders().catch(() => [] as Order[]),
           fetchCheckins().catch(() => [] as Checkin[]),
           fetchEscalations().catch(() => [] as Escalation[]),
+          fetchTickets().catch(() => [] as Ticket[]),
         ]);
 
         const totalRevenue = zones.reduce((sum, z) => sum + (z.sold * z.price), 0);
@@ -153,6 +157,17 @@ export default function SummaryPage() {
         });
 
         setActividadReciente(actividades.slice(0, 8));
+
+        // Boletos recientes from tickets
+        setBoletosRecientes(tickets.filter(t => t.customer_name).slice(0, 6).map(t => ({
+          id: t.id,
+          ticket: t.ticket_number,
+          cliente: t.customer_name || 'Anónimo',
+          evento: eventMap.get(t.event_id)?.name || t.event_id,
+          zona: t.zone_name,
+          status: t.status,
+          fecha: formatTimeAgo(t.created_at),
+        })));
 
         // Ventas recientes from orders
         setVentasRecientes(orders.filter(o => o.customer_name).slice(0, 6).map(o => ({
@@ -237,28 +252,34 @@ export default function SummaryPage() {
           </div>
         )}
 
-        {/* Ventas Recientes */}
-        {ventasRecientes.length > 0 && (
+        {/* Boletos Vendidos */}
+        {boletosRecientes.length > 0 && (
           <div className="section-card">
             <div className="section-card-header !py-2 !px-3">
-              <span className="section-card-title text-sm">💰 Ventas Recientes</span>
+              <span className="section-card-title text-sm">🎫 Boletos Vendidos</span>
             </div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-gray-500 border-b">
+                  <th className="px-3 py-1.5 font-medium">Ticket</th>
                   <th className="px-3 py-1.5 font-medium">Cliente</th>
                   <th className="px-3 py-1.5 font-medium">Evento</th>
                   <th className="px-3 py-1.5 font-medium">Zona</th>
-                  <th className="px-3 py-1.5 font-medium text-right">Total</th>
+                  <th className="px-3 py-1.5 font-medium">Estado</th>
                 </tr>
               </thead>
               <tbody>
-                {ventasRecientes.map((v) => (
-                  <tr key={v.id} className="border-b border-gray-50 last:border-0">
-                    <td className="px-3 py-1.5 text-gray-900">{v.cliente}</td>
-                    <td className="px-3 py-1.5 text-gray-600 truncate max-w-[120px]">{v.evento}</td>
-                    <td className="px-3 py-1.5 text-gray-500">{v.zona}</td>
-                    <td className="px-3 py-1.5 text-right font-medium text-gray-900">${v.total.toLocaleString()}</td>
+                {boletosRecientes.map((b) => (
+                  <tr key={b.id} className="border-b border-gray-50 last:border-0">
+                    <td className="px-3 py-1.5 font-mono text-xs text-[#E63946]">{b.ticket}</td>
+                    <td className="px-3 py-1.5 text-gray-900">{b.cliente}</td>
+                    <td className="px-3 py-1.5 text-gray-600 truncate max-w-[120px]">{b.evento}</td>
+                    <td className="px-3 py-1.5 text-gray-500">{b.zona}</td>
+                    <td className="px-3 py-1.5">
+                      <span className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${b.status === 'valid' ? 'bg-green-50 text-green-700' : b.status === 'used' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {b.status === 'valid' ? 'Válido' : b.status === 'used' ? 'Usado' : b.status}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
