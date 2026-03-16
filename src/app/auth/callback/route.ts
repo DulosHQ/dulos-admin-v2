@@ -24,9 +24,15 @@ export async function GET(request: Request) {
         },
       }
     );
-    await supabase.auth.exchangeCodeForSession(code);
+    const { data } = await supabase.auth.exchangeCodeForSession(code);
+
+    // SECURITY: Block unauthorized emails immediately
+    const userEmail = data?.user?.email?.toLowerCase();
+    if (userEmail !== "angel.lopez@vulkn-ai.com") {
+      await supabase.auth.signOut();
+      return NextResponse.redirect(`${origin}/login?error=acceso_denegado`);
+    }
   }
 
-  // Redirect to dashboard - middleware will validate dulos_team membership
   return NextResponse.redirect(`${origin}/`);
 }

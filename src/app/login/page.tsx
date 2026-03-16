@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
 
@@ -43,13 +43,22 @@ async function validateTeamMember(email: string): Promise<{ valid: boolean; erro
   }
 }
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
+
+  // Check for access denied error from OAuth callback
+  useEffect(() => {
+    if (searchParams?.get("error") === "acceso_denegado") {
+      setAccessDenied(true);
+    }
+  }, [searchParams]);
 
   // Check if already logged in on mount
   useEffect(() => {
@@ -100,16 +109,27 @@ export default function LoginPage() {
   const handleGoogle = async () => {
     setLoading(true);
     setError("");
+    setAccessDenied(false);
     localStorage.removeItem("dulos_user");
     const supabase = getSupabase();
+
+    // Set a 10-second timeout for OAuth redirect
+    const timeoutId = setTimeout(() => {
+      setError("Error al conectar con Google. Intenta de nuevo.");
+      setLoading(false);
+    }, 10000);
+
     const { error: oauthErr } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
+
     if (oauthErr) {
+      clearTimeout(timeoutId);
       setError("Error al conectar con Google");
       setLoading(false);
     }
+    // Note: If OAuth succeeds, the page will redirect and timeout won't fire
   };
 
   if (checkingSession) {
@@ -128,6 +148,13 @@ export default function LoginPage() {
         </div>
         <h1 className="text-white text-xl font-semibold text-center">Panel de Administración</h1>
         <p className="text-gray-500 text-sm text-center mt-1 mb-6">Acceso exclusivo para personal autorizado</p>
+
+        {accessDenied && (
+          <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 mb-6 text-red-400 text-sm text-center">
+            <span className="block text-lg mb-1">⛔</span>
+            Acceso denegado. Este panel es de uso exclusivo. Tu cuenta de Google no está autorizada.
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-6 text-red-400 text-sm text-center">
@@ -159,5 +186,17 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+        <div className="animate-pulse text-gray-500">Cargando...</div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }
