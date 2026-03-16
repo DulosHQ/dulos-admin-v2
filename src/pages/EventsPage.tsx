@@ -33,6 +33,7 @@ interface EventDisplay {
   zones: ZoneDisplay[];
   schedules: ScheduleDisplay[];
   orders: OrderDisplay[];
+  ticketTypes: TicketTypeDisplay[];
 }
 
 interface ZoneDisplay {
@@ -41,6 +42,14 @@ interface ZoneDisplay {
   precio: number;
   capacidad: number;
   vendidos: number;
+}
+
+interface TicketTypeDisplay {
+  id: string;
+  name: string;
+  price: number;
+  sold: number;
+  available: number;
 }
 
 interface ScheduleDisplay {
@@ -169,6 +178,23 @@ export default function EventsPage() {
             const totalTickets = eventZones.reduce((sum, z) => sum + z.available + z.sold, 0);
             const revenue = eventZones.reduce((sum, z) => sum + (z.sold * z.price), 0);
 
+            // Create ticket types from unique zone names with aggregated data
+            const ticketTypeMap = new Map<string, { price: number; sold: number; available: number }>();
+            eventZones.forEach(z => {
+              const existing = ticketTypeMap.get(z.zone_name);
+              if (existing) {
+                existing.sold += z.sold;
+                existing.available += z.available;
+                existing.price = Math.max(existing.price, z.price); // Use highest price for zone
+              } else {
+                ticketTypeMap.set(z.zone_name, {
+                  price: z.price,
+                  sold: z.sold,
+                  available: z.available
+                });
+              }
+            });
+
             return {
               id: event.id,
               name: event.name,
@@ -203,6 +229,13 @@ export default function EventsPage() {
                 estado: mapPaymentStatus(o.payment_status),
                 fecha: o.purchased_at,
               })),
+              ticketTypes: Array.from(ticketTypeMap.entries()).map(([name, data], idx) => ({
+                id: `ticket-type-${idx}`,
+                name,
+                price: data.price,
+                sold: data.sold,
+                available: data.available,
+              })).sort((a, b) => b.price - a.price),
             };
           });
 
@@ -424,69 +457,169 @@ export default function EventsPage() {
                                 </td>
                               </tr>
                               {expandedEventIds.includes(event.id) && (
-                                <tr><td colSpan={6} className="bg-white p-3">
-                                  <div className="space-y-3">
-                                    {/* Ordenes Recientes - only show if orders exist */}
-                                    {event.orders.length > 0 && (
-                                    <div className="rounded-xl bg-white border border-gray-200 p-3">
-                                      <h4 className="font-semibold text-gray-900 mb-3">Ordenes recientes</h4>
-                                        <div className="overflow-x-auto">
-                                          <table className="w-full text-sm">
-                                            <thead><tr className="text-left text-gray-500 border-b">
-                                              <th className="pb-2"># Orden</th><th className="pb-2">Cliente</th><th className="pb-2 hidden sm:table-cell">Email</th><th className="pb-2">Zona</th><th className="pb-2">Cant.</th><th className="pb-2">Total</th><th className="pb-2">Estado</th><th className="pb-2 hidden sm:table-cell">Fecha</th>
-                                            </tr></thead>
-                                            <tbody>
-                                              {event.orders.map((o) => (
-                                                <tr key={o.id} onClick={() => setSelectedOrder(o)} className="border-b cursor-pointer hover:bg-gray-50">
-                                                  <td className="py-2 text-[#E63946] font-medium">{o.id}</td><td className="py-2">{o.cliente}</td><td className="py-2 hidden sm:table-cell">{o.email}</td><td className="py-2">{o.zona}</td><td className="py-2">{o.cantidad}</td><td className="py-2">{formatCurrency(o.total)}</td><td className="py-2"><span className={`text-white text-xs px-2 py-0.5 rounded-full ${getOrderStatusColor(o.estado)}`}>{o.estado}</span></td><td className="py-2 hidden sm:table-cell">{formatDate(o.fecha)}</td>
-                                                </tr>
-                                              ))}
-                                            </tbody>
-                                          </table>
+                                <tr><td colSpan={6} className="bg-white p-4">
+                                  <div className="space-y-4">
+                                    {/* Event Image Gallery - Show larger image */}
+                                    {event.image_url && (
+                                      <div className="rounded-xl bg-white border border-gray-200 p-3">
+                                        <h4 className="font-extrabold text-gray-900 mb-3 text-sm">Galería del Evento</h4>
+                                        <div className="flex gap-3">
+                                          <img 
+                                            src={event.image_url} 
+                                            alt={event.name} 
+                                            className="w-32 h-20 rounded-lg object-cover shadow-md"
+                                          />
+                                          <div className="flex-1">
+                                            <p className="text-sm font-bold text-gray-900">{event.name}</p>
+                                            <p className="text-xs text-gray-500 mt-1">{event.venue}</p>
+                                            <p className="text-xs text-gray-500">{formatDate(event.date)}</p>
+                                            <button 
+                                              onClick={() => alert('Gestionar galería')} 
+                                              className="text-xs text-[#E63946] font-bold hover:underline mt-1"
+                                            >
+                                              + Gestionar Galería
+                                            </button>
+                                          </div>
                                         </div>
-                                    </div>
+                                      </div>
                                     )}
-                                    {/* Zonas + Funciones side by side */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                                    {/* Zonas */}
+
+                                    {/* Ticket Types Section */}
                                     <div className="rounded-xl bg-white border border-gray-200 p-3">
                                       <div className="flex justify-between items-center mb-3">
-                                        <h4 className="font-semibold text-gray-900">Zonas</h4>
-                                        <button onClick={() => alert('Agregar zona')} className="text-sm text-[#E63946] font-medium hover:underline">+ Agregar Zona</button>
+                                        <h4 className="font-extrabold text-gray-900 text-sm">Tipos de Boletos</h4>
+                                        <button onClick={() => alert('Agregar tipo de boleto')} className="text-xs text-[#E63946] font-bold hover:underline">+ Agregar Tipo</button>
                                       </div>
-                                      {event.zones.length > 0 ? (
-                                        <div className="grid gap-3">
-                                          {event.zones.map((z) => {
-                                            const pct = z.capacidad > 0 ? (z.vendidos / z.capacidad) * 100 : 0;
+                                      {event.ticketTypes.length > 0 ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                          {event.ticketTypes.map((ticket) => {
+                                            const soldPct = ticket.available > 0 ? (ticket.sold / (ticket.sold + ticket.available)) * 100 : 0;
                                             return (
-                                              <div key={z.id} className="border rounded-lg p-3">
-                                                <div className="flex justify-between items-center mb-2"><span className="font-medium">{z.nombre}</span><button onClick={() => alert('Editar zona: ' + z.nombre)} className="text-xs text-[#E63946] hover:underline">Editar</button></div>
-                                                <p className="text-sm text-gray-600">{formatCurrency(z.precio)}</p>
-                                                <div className="flex items-center gap-2 mt-2"><div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden"><div className={`h-full ${getOccupancyColor(pct)}`} style={{ width: `${pct}%` }} /></div><span className="text-xs text-gray-500">{z.vendidos}/{z.capacidad}</span></div>
+                                              <div key={ticket.id} className="border rounded-lg p-3 bg-gray-50">
+                                                <div className="flex justify-between items-center mb-2">
+                                                  <span className="font-extrabold text-sm">{ticket.name}</span>
+                                                  <button onClick={() => alert('Editar: ' + ticket.name)} className="text-xs text-[#E63946] hover:underline">Editar</button>
+                                                </div>
+                                                <p className="text-lg font-extrabold text-[#E63946]">{formatCurrency(ticket.price)}</p>
+                                                <div className="flex items-center gap-2 mt-2">
+                                                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                                    <div className={`h-full ${getOccupancyColor(soldPct)}`} style={{ width: `${soldPct}%` }} />
+                                                  </div>
+                                                  <span className="text-xs text-gray-500 font-bold">{ticket.sold}/{ticket.sold + ticket.available}</span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1">{soldPct.toFixed(1)}% vendido</p>
                                               </div>
                                             );
                                           })}
                                         </div>
                                       ) : (
-                                        <p className="text-gray-500 text-sm">No hay zonas configuradas</p>
+                                        <p className="text-gray-500 text-sm">No hay tipos de boletos configurados</p>
                                       )}
                                     </div>
-                                    {/* Funciones */}
+
+                                    {/* Orders and Zones Grid */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                      {/* Orders Section */}
+                                      {event.orders.length > 0 && (
+                                        <div className="rounded-xl bg-white border border-gray-200 p-3">
+                                          <h4 className="font-extrabold text-gray-900 mb-3 text-sm">Órdenes Recientes ({event.orders.length})</h4>
+                                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                                            {event.orders.map((o) => (
+                                              <div key={o.id} onClick={() => setSelectedOrder(o)} className="border rounded-lg p-2 cursor-pointer hover:bg-gray-50 transition-colors">
+                                                <div className="flex justify-between items-start">
+                                                  <div className="flex-1">
+                                                    <div className="flex gap-2 items-center">
+                                                      <span className="text-xs font-mono text-[#E63946] font-bold">{o.id}</span>
+                                                      <span className={`text-white text-xs px-1.5 py-0.5 rounded-full font-bold ${getOrderStatusColor(o.estado)}`}>{o.estado}</span>
+                                                    </div>
+                                                    <p className="text-sm font-bold text-gray-900 mt-0.5">{o.cliente}</p>
+                                                    <p className="text-xs text-gray-500">{o.zona} • {o.cantidad} boleto{o.cantidad > 1 ? 's' : ''}</p>
+                                                  </div>
+                                                  <div className="text-right">
+                                                    <p className="text-sm font-extrabold text-gray-900">{formatCurrency(o.total)}</p>
+                                                    <p className="text-xs text-gray-500">{formatDate(o.fecha)}</p>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                          <button 
+                                            onClick={() => alert('Ver todas las órdenes')} 
+                                            className="w-full mt-3 py-1.5 text-center text-xs text-[#E63946] font-bold hover:bg-gray-50 border border-gray-200 rounded-lg"
+                                          >
+                                            Ver Todas las Órdenes
+                                          </button>
+                                        </div>
+                                      )}
+
+                                      {/* Zones Section */}
+                                      <div className="rounded-xl bg-white border border-gray-200 p-3">
+                                        <div className="flex justify-between items-center mb-3">
+                                          <h4 className="font-extrabold text-gray-900 text-sm">Zonas ({event.zones.length})</h4>
+                                          <button onClick={() => alert('Agregar zona')} className="text-xs text-[#E63946] font-bold hover:underline">+ Agregar Zona</button>
+                                        </div>
+                                        {event.zones.length > 0 ? (
+                                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                                            {event.zones.map((z) => {
+                                              const pct = z.capacidad > 0 ? (z.vendidos / z.capacidad) * 100 : 0;
+                                              return (
+                                                <div key={z.id} className="border rounded-lg p-2">
+                                                  <div className="flex justify-between items-center mb-1">
+                                                    <span className="font-extrabold text-sm">{z.nombre}</span>
+                                                    <button onClick={() => alert('Editar zona: ' + z.nombre)} className="text-xs text-[#E63946] hover:underline">Editar</button>
+                                                  </div>
+                                                  <div className="flex items-center justify-between">
+                                                    <span className="text-sm font-bold text-gray-600">{formatCurrency(z.precio)}</span>
+                                                    <span className="text-xs text-gray-500 font-bold">{z.vendidos}/{z.capacidad} ({pct.toFixed(0)}%)</span>
+                                                  </div>
+                                                  <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden mt-1">
+                                                    <div className={`h-full ${getOccupancyColor(pct)}`} style={{ width: `${pct}%` }} />
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : (
+                                          <p className="text-gray-500 text-sm">No hay zonas configuradas</p>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Schedules Section - Improved */}
                                     <div className="rounded-xl bg-white border border-gray-200 p-3">
                                       <div className="flex justify-between items-center mb-3">
-                                        <h4 className="font-semibold text-gray-900">Funciones</h4>
-                                        <button onClick={() => alert('Agregar funcion')} className="text-sm text-[#E63946] font-medium hover:underline">+ Agregar Funcion</button>
+                                        <h4 className="font-extrabold text-gray-900 text-sm">Funciones ({event.schedules.length})</h4>
+                                        <button onClick={() => alert('Agregar funcion')} className="text-xs text-[#E63946] font-bold hover:underline">+ Agregar Función</button>
                                       </div>
                                       {event.schedules.length > 0 ? (
                                         <div className="overflow-x-auto">
-                                          <table className="w-full text-sm">
-                                            <thead><tr className="text-left text-gray-500 border-b"><th className="pb-2">Fecha</th><th className="pb-2">Hora inicio</th><th className="pb-2">Hora fin</th><th className="pb-2">Estado</th><th className="pb-2">Vendidos</th></tr></thead>
+                                          <table className="w-full text-xs">
+                                            <thead>
+                                              <tr className="text-left text-gray-500 border-b">
+                                                <th className="pb-2 font-bold">Fecha</th>
+                                                <th className="pb-2 font-bold">Horario</th>
+                                                <th className="pb-2 font-bold text-center">Estado</th>
+                                                <th className="pb-2 font-bold text-right">Vendidos</th>
+                                                <th className="pb-2 font-bold">Acciones</th>
+                                              </tr>
+                                            </thead>
                                             <tbody>
                                               {event.schedules.map((f) => (
-                                                <tr key={f.id} className="border-b last:border-0">
-                                                  <td className="py-2">{f.fecha}</td><td className="py-2">{f.horaInicio}</td><td className="py-2">{f.horaFin}</td>
-                                                  <td className="py-2"><button onClick={() => alert('Toggle estado funcion')} className={`w-10 h-5 rounded-full relative ${f.activa ? 'bg-[#E63946]' : 'bg-gray-300'}`}><span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${f.activa ? 'right-0.5' : 'left-0.5'}`} /></button></td>
-                                                  <td className="py-2">{f.vendidos}</td>
+                                                <tr key={f.id} className="border-b last:border-0 hover:bg-gray-50">
+                                                  <td className="py-1.5 font-bold">{f.fecha}</td>
+                                                  <td className="py-1.5 text-gray-600">{f.horaInicio} - {f.horaFin}</td>
+                                                  <td className="py-1.5 text-center">
+                                                    <button 
+                                                      onClick={() => alert('Toggle estado función')} 
+                                                      className={`w-10 h-5 rounded-full relative transition-all ${f.activa ? 'bg-[#E63946]' : 'bg-gray-300'}`}
+                                                    >
+                                                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${f.activa ? 'right-0.5' : 'left-0.5'}`} />
+                                                    </button>
+                                                  </td>
+                                                  <td className="py-1.5 text-right font-bold text-[#E63946]">{f.vendidos}</td>
+                                                  <td className="py-1.5">
+                                                    <button onClick={() => alert('Editar función')} className="text-xs text-[#E63946] hover:underline">Editar</button>
+                                                  </td>
                                                 </tr>
                                               ))}
                                             </tbody>
@@ -495,7 +628,6 @@ export default function EventsPage() {
                                       ) : (
                                         <p className="text-gray-500 text-sm">No hay funciones programadas</p>
                                       )}
-                                    </div>
                                     </div>
                                   </div>
                                 </td></tr>

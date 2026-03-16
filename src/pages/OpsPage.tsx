@@ -1,7 +1,18 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { fetchCheckins, fetchAllCoupons, fetchTickets, Checkin, Coupon, Ticket } from '../lib/supabase'
+import { 
+  fetchCheckins, 
+  fetchAllCoupons, 
+  fetchTickets, 
+  searchCustomerByNameOrEmail, 
+  fetchNotificationLogs,
+  Checkin, 
+  Coupon, 
+  Ticket, 
+  Customer, 
+  AuditLog 
+} from '../lib/supabase'
 
 const ACCENT = '#E63946'
 
@@ -14,8 +25,12 @@ export default function OpsPage() {
   const [checkins, setCheckins] = useState<Checkin[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [cupones, setCupones] = useState<Coupon[]>([])
+  const [notificationLogs, setNotificationLogs] = useState<AuditLog[]>([])
   const [filtroEvento, setFiltroEvento] = useState('')
   const [busqueda, setBusqueda] = useState('')
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [searchResults, setSearchResults] = useState<Customer[]>([])
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [cameraActive, setCameraActive] = useState(false)
   const [scanResult, setScanResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [manualTicket, setManualTicket] = useState('')
@@ -27,13 +42,26 @@ export default function OpsPage() {
       fetchCheckins().catch(() => []),
       fetchAllCoupons().catch(() => []),
       fetchTickets().catch(() => []),
-    ]).then(([ci, co, tk]) => {
+      fetchNotificationLogs().catch(() => []),
+    ]).then(([ci, co, tk, nl]) => {
       setCheckins(ci.filter((c: Checkin) => c.customer_name && c.customer_name !== 'DUPLICADO'))
       setCupones(co)
       setTickets(tk)
+      setNotificationLogs(nl)
       setLoading(false)
     })
   }, [])
+
+  // Customer search function
+  const handleCustomerSearch = async () => {
+    if (!customerSearch.trim()) return
+    try {
+      const results = await searchCustomerByNameOrEmail(customerSearch.trim())
+      setSearchResults(results)
+    } catch (error) {
+      console.error('Error searching customers:', error)
+    }
+  }
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach(t => t.stop())
@@ -189,12 +217,65 @@ export default function OpsPage() {
         </div>
       </div>
 
-      {/* Historial + Cupones */}
+      {/* Customer Lookup Section */}
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="px-3 py-2 border-b border-gray-100">
+          <h3 className="text-sm font-extrabold">Búsqueda de Clientes</h3>
+        </div>
+        <div className="p-3">
+          <div className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={customerSearch}
+              onChange={e => setCustomerSearch(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCustomerSearch()}
+              placeholder="Buscar por nombre o email..."
+              className="flex-1 px-3 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:border-[#E63946] focus:ring-1 focus:ring-[#E63946]"
+            />
+            <button 
+              onClick={handleCustomerSearch}
+              className="px-3 py-1.5 bg-[#E63946] text-white rounded text-sm font-bold hover:bg-[#c5303c]"
+            >
+              Buscar
+            </button>
+          </div>
+          
+          {searchResults.length > 0 && (
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {searchResults.map(customer => (
+                <div 
+                  key={customer.id}
+                  onClick={() => setSelectedCustomer(customer)}
+                  className="p-2 border border-gray-200 rounded cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-extrabold text-sm">{customer.name}</p>
+                      <p className="text-xs text-gray-500">{customer.email}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {customer.total_orders} orden{customer.total_orders !== 1 ? 'es' : ''} • 
+                        Cliente desde {new Date(customer.created_at).toLocaleDateString('es-MX')}
+                      </p>
+                    </div>
+                    <button className="text-xs text-[#E63946] font-bold hover:underline">Ver Historial</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {customerSearch && searchResults.length === 0 && (
+            <p className="text-center text-gray-500 text-sm py-4">No se encontraron clientes</p>
+          )}
+        </div>
+      </div>
+
+      {/* Historial + Cupones + Notifications */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Historial */}
-        <div className="lg:col-span-2 bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="text-sm font-bold">Historial de Check-ins</h3>
+            <h3 className="text-sm font-extrabold">Historial de Check-ins</h3>
             <div className="flex gap-2">
               <select value={filtroEvento} onChange={e => setFiltroEvento(e.target.value)} className="px-2 py-1 border border-gray-200 rounded text-xs">
                 <option value="">Todos</option>
@@ -234,19 +315,50 @@ export default function OpsPage() {
           </div>
         </div>
 
+        {/* Notification Log */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="text-sm font-extrabold">Log de Notificaciones</h3>
+            <button className="px-2 py-1 text-white rounded text-xs font-bold" style={{ backgroundColor: ACCENT }}>Filtros</button>
+          </div>
+          <div className="max-h-[300px] overflow-y-auto">
+            {notificationLogs.length > 0 ? (
+              <div className="divide-y divide-gray-50">
+                {notificationLogs.map(log => (
+                  <div key={log.id} className="px-3 py-2">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className="text-xs font-bold text-gray-900">{log.action}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{log.user_email}</p>
+                        <p className="text-xs text-gray-400">{formatTime(log.created_at)}</p>
+                      </div>
+                      <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1"></span>
+                    </div>
+                    {log.details && (
+                      <p className="text-xs text-gray-600 mt-1 line-clamp-2">{log.details}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-6 text-center text-gray-400 text-xs">Sin notificaciones</div>
+            )}
+          </div>
+        </div>
+
         {/* Cupones */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="text-sm font-bold">Cupones</h3>
-            <button className="px-2 py-1 text-white rounded text-xs font-medium" style={{ backgroundColor: ACCENT }}>+ Crear</button>
+            <h3 className="text-sm font-extrabold">Cupones</h3>
+            <button className="px-2 py-1 text-white rounded text-xs font-bold" style={{ backgroundColor: ACCENT }}>+ Crear</button>
           </div>
           <div className="divide-y divide-gray-50 max-h-[300px] overflow-y-auto">
             {cupones.map(c => (
               <div key={c.id} className="flex items-center justify-between px-3 py-2">
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono font-bold text-xs">{c.code}</span>
-                    <span className="px-1 py-0.5 text-[10px] rounded bg-gray-100">{c.discount_type === 'percentage' ? `${c.discount_value}%` : `$${c.discount_value}`}</span>
+                    <span className="font-mono font-extrabold text-xs">{c.code}</span>
+                    <span className="px-1 py-0.5 text-[10px] rounded bg-gray-100 font-bold">{c.discount_type === 'percentage' ? `${c.discount_value}%` : `$${c.discount_value}`}</span>
                   </div>
                   <div className="flex items-center gap-1 mt-0.5">
                     <div className="w-16 h-1 bg-gray-200 rounded-full"><div className="h-full rounded-full" style={{ width: `${c.max_uses ? (c.used_count / c.max_uses) * 100 : 0}%`, backgroundColor: ACCENT }} /></div>
@@ -260,6 +372,81 @@ export default function OpsPage() {
           </div>
         </div>
       </div>
+
+      {/* Customer Detail Modal */}
+      {selectedCustomer && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedCustomer(null)}>
+          <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-extrabold text-gray-900">Historial de Cliente</h3>
+              <button 
+                onClick={() => setSelectedCustomer(null)}
+                className="text-gray-500 hover:text-gray-700 text-xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="font-extrabold text-lg text-gray-900">{selectedCustomer.name}</p>
+                <p className="text-sm text-gray-600">{selectedCustomer.email}</p>
+                <div className="flex gap-4 mt-2 text-xs">
+                  <span className="text-gray-500">
+                    <span className="font-bold">{selectedCustomer.total_orders}</span> órdenes
+                  </span>
+                  <span className="text-gray-500">
+                    Cliente desde <span className="font-bold">{new Date(selectedCustomer.created_at).toLocaleDateString('es-MX')}</span>
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                <h4 className="font-extrabold text-sm text-gray-900">Historial de Compras</h4>
+                {(selectedCustomer as any).tickets?.length > 0 ? (
+                  (selectedCustomer as any).tickets.map((ticket: any, index: number) => (
+                    <div key={index} className="p-2 border border-gray-200 rounded">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-xs font-bold text-[#E63946]">{ticket.ticket_number}</p>
+                          <p className="text-xs text-gray-600">{ticket.zone_name}</p>
+                          <p className="text-xs text-gray-400">
+                            {new Date(ticket.created_at).toLocaleDateString('es-MX')}
+                          </p>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold text-white ${
+                          ticket.status === 'valid' ? 'bg-green-500' :
+                          ticket.status === 'used' ? 'bg-blue-500' : 'bg-yellow-500'
+                        }`}>
+                          {ticket.status === 'valid' ? 'Válido' : 
+                           ticket.status === 'used' ? 'Usado' : 'Pendiente'}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-gray-500 text-sm py-4">Sin historial de compras</p>
+                )}
+              </div>
+
+              <div className="flex gap-2 justify-end pt-4 border-t">
+                <button 
+                  onClick={() => alert('Enviar email al cliente')}
+                  className="px-4 py-2 bg-[#E63946] text-white rounded-lg text-sm font-bold hover:bg-[#c5303c]"
+                >
+                  Enviar Email
+                </button>
+                <button 
+                  onClick={() => setSelectedCustomer(null)}
+                  className="px-4 py-2 text-gray-500 hover:text-gray-700 text-sm font-bold"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
