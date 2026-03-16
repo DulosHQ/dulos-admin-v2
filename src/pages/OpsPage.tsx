@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const ACCENT = '#E63946'
 const tabs = ['Scanner', 'Historial', 'Cupones'] as const
@@ -31,9 +31,26 @@ const cuponesInit = [
   { id: 4, nombre: 'BLACKFRIDAY', descuento: '30%', usado: 100, total: 100, activo: false },
 ]
 
+const eventosUnicos = [...new Set(historial.map(h => h.evento))]
+
 export default function OpsPage() {
   const [activeTab, setActiveTab] = useState<typeof tabs[number]>('Scanner')
   const [cupones, setCupones] = useState(cuponesInit)
+  const [filtroEvento, setFiltroEvento] = useState('')
+  const [busquedaCliente, setBusquedaCliente] = useState('')
+  const [checkInCount, setCheckInCount] = useState(234)
+
+  useEffect(() => {
+    if (activeTab !== 'Scanner') return
+    const interval = setInterval(() => setCheckInCount(c => Math.min(c + 1, 1200)), 5000)
+    return () => clearInterval(interval)
+  }, [activeTab])
+
+  const historialFiltrado = historial.filter(h => {
+    const matchEvento = !filtroEvento || h.evento === filtroEvento
+    const matchCliente = !busquedaCliente || h.cliente.toLowerCase().includes(busquedaCliente.toLowerCase())
+    return matchEvento && matchCliente
+  })
 
   const toggleCupon = (id: number) => {
     setCupones(cupones.map(c => c.id === id ? { ...c, activo: !c.activo } : c))
@@ -63,7 +80,16 @@ export default function OpsPage() {
         </div>
 
         {activeTab === 'Scanner' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">Check-ins hoy: {checkInCount} / 1,200 ({Math.round((checkInCount / 1200) * 100)}%)</span>
+              </div>
+              <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-[#E63946] rounded-full transition-all" style={{ width: `${(checkInCount / 1200) * 100}%` }} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-gray-900 rounded-xl aspect-video flex flex-col items-center justify-center gap-4 p-6">
               <span className="text-6xl">📷</span>
               <p className="text-white text-lg">QR Scanner</p>
@@ -103,10 +129,28 @@ export default function OpsPage() {
               </div>
             </div>
           </div>
+          </div>
         )}
 
         {activeTab === 'Historial' && (
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-gray-200 flex gap-4">
+              <select
+                value={filtroEvento}
+                onChange={e => setFiltroEvento(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E63946]"
+              >
+                <option value="">Todos los eventos</option>
+                {eventosUnicos.map(e => <option key={e} value={e}>{e}</option>)}
+              </select>
+              <input
+                type="text"
+                placeholder="Buscar cliente..."
+                value={busquedaCliente}
+                onChange={e => setBusquedaCliente(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E63946]"
+              />
+            </div>
             <table className="w-full">
               <thead className="bg-[#f8f6f6]">
                 <tr>
@@ -118,7 +162,7 @@ export default function OpsPage() {
                 </tr>
               </thead>
               <tbody>
-                {historial.map((h, i) => (
+                {historialFiltrado.map((h, i) => (
                   <tr key={i} className="border-t border-gray-100 hover:bg-[#f8f6f6]">
                     <td className="py-3 px-4 text-sm font-mono text-gray-900">{h.ticket}</td>
                     <td className="py-3 px-4 text-sm text-gray-900">{h.cliente}</td>

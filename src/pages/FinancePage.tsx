@@ -93,17 +93,46 @@ const tabs: { key: TabKey; label: string }[] = [
   { key: 'tendencias', label: 'Tendencias' },
 ];
 
+const exportCSV = () => {
+  const rows = [
+    ['Métrica', 'Valor Actual', 'Valor Anterior', 'Cambio %'],
+    ['Ingresos', '2847650', '2156800', '+32%'],
+    ['AOV', '1245', '1180', '+5.5%'],
+    ['Órdenes Completadas', '2287', '1828', '+25%'],
+    ['Ocupación %', '78.5', '65.2', '+13.3%'],
+    ['Boletos VIP', '1245800', '-', '+23%'],
+    ['Boletos General', '1156350', '-', '+18%'],
+    ['Servicios Adicionales', '445500', '-', '-5%'],
+  ];
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'metricas_financieras.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
 export default function FinancePage() {
   const [activeTab, setActiveTab] = useState<TabKey>('ingresos');
 
   return (
     <div className="min-h-screen bg-[#f8f6f6] p-6">
       <div className="max-w-7xl mx-auto">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Panel Financiero</h1>
-          <p className="text-gray-500 mt-1">
-            Métricas de ingresos, capacidad y tendencias de venta
-          </p>
+        <header className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Panel Financiero</h1>
+            <p className="text-gray-500 mt-1">
+              Métricas de ingresos, capacidad y tendencias de venta
+            </p>
+          </div>
+          <button
+            onClick={exportCSV}
+            className="px-4 py-2 bg-[#E63946] text-white rounded-lg font-medium hover:bg-[#c5303c] transition-colors"
+          >
+            Exportar CSV
+          </button>
         </header>
 
         <nav className="mb-6">
