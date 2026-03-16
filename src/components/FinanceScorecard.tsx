@@ -55,12 +55,16 @@ function Card({ title, value, change, isPercentage = false, icon, iconBg }: Card
         {value}
         {isPercentage && <span className="text-2xl">%</span>}
       </p>
-      <p className="metric-card-subtitle">
-        <span className={isPositive ? 'pct-positive' : 'pct-negative'}>
-          {isPositive ? '+' : ''}{change.toFixed(1)}%
-        </span>
-        <span className="text-gray-400 ml-1">vs periodo anterior</span>
-      </p>
+      {change !== 0 ? (
+        <p className="metric-card-subtitle">
+          <span className={isPositive ? 'pct-positive' : 'pct-negative'}>
+            {isPositive ? '+' : ''}{change.toFixed(1)}%
+          </span>
+          <span className="text-gray-400 ml-1">vs periodo anterior</span>
+        </p>
+      ) : (
+        <p className="metric-card-subtitle text-gray-400">Datos actuales</p>
+      )}
       <div className={`metric-card-icon ${iconBg}`}>
         {icon}
       </div>

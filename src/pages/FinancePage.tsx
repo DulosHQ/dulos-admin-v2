@@ -105,11 +105,11 @@ export default function FinancePage() {
         const completedOrders = orders.filter((o) => o.payment_status === 'paid' || o.payment_status === 'completed').length;
         const aov = completedOrders > 0 ? totalRevenue / completedOrders : totalSold > 0 ? totalRevenue / totalSold : 0;
 
-        // Estimate previous period (mock 10-30% difference)
-        const revenuePrevious = totalRevenue * 0.85;
-        const aovPrevious = aov * 0.95;
-        const completedOrdersPrevious = Math.max(1, Math.floor(completedOrders * 0.8));
-        const occupancyPercentPrevious = occupancyPercent * 0.9;
+        // No historical data available — set previous = current so change = 0
+        const revenuePrevious = totalRevenue;
+        const aovPrevious = aov;
+        const completedOrdersPrevious = completedOrders;
+        const occupancyPercentPrevious = occupancyPercent;
 
         setScorecardData({
           revenue: totalRevenue,
@@ -133,7 +133,7 @@ export default function FinancePage() {
           .map(([zone, revenue]) => ({
             zone,
             revenue,
-            change: Math.floor(Math.random() * 30) - 5, // Mock change
+            change: 0,
           }))
           .sort((a, b) => b.revenue - a.revenue)
           .slice(0, 3);
@@ -191,7 +191,7 @@ export default function FinancePage() {
         // If no order data, use zone revenue distributed across days
         const dailyArray = Array.from(dailyMap.entries()).map(([date, amount]) => ({
           date,
-          amount: amount || Math.floor(totalRevenue / 7 * (0.8 + Math.random() * 0.4)),
+          amount,
         }));
 
         setDailyData(dailyArray);
@@ -212,7 +212,7 @@ export default function FinancePage() {
       ['AOV', scorecardData.aov.toFixed(0), scorecardData.aovPrevious.toFixed(0), `${((scorecardData.aov - scorecardData.aovPrevious) / scorecardData.aovPrevious * 100).toFixed(1)}%`],
       ['Ordenes Completadas', scorecardData.completedOrders.toString(), scorecardData.completedOrdersPrevious.toString(), `${((scorecardData.completedOrders - scorecardData.completedOrdersPrevious) / scorecardData.completedOrdersPrevious * 100).toFixed(1)}%`],
       ['Ocupacion %', scorecardData.occupancyPercent.toFixed(1), scorecardData.occupancyPercentPrevious.toFixed(1), `${(scorecardData.occupancyPercent - scorecardData.occupancyPercentPrevious).toFixed(1)}%`],
-      ...zoneRevenues.map((z) => [z.zone, z.revenue.toString(), '-', `${z.change > 0 ? '+' : ''}${z.change}%`]),
+      ...zoneRevenues.map((z) => [z.zone, z.revenue.toString(), '-', '-']),
     ];
     const csv = rows.map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -226,7 +226,7 @@ export default function FinancePage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
         </div>
@@ -235,7 +235,7 @@ export default function FinancePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Page Header with Export */}
       <div className="flex justify-between items-center">
         <div>
@@ -279,7 +279,7 @@ export default function FinancePage() {
 
       {/* Content */}
       {activeTab === 'ingresos' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <FinanceScorecard data={scorecardData} currency="MXN" />
 
           <div className="section-card">
@@ -297,11 +297,8 @@ export default function FinancePage() {
                     <p className="metric-card-value">
                       {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(z.revenue)}
                     </p>
-                    <p className="metric-card-subtitle">
-                      <span className={z.change >= 0 ? 'pct-positive' : 'pct-negative'}>
-                        {z.change >= 0 ? '+' : ''}{z.change}%
-                      </span>
-                      <span className="text-gray-400 ml-1">vs mes anterior</span>
+                    <p className="metric-card-subtitle text-gray-400">
+                      Ingresos acumulados
                     </p>
                   </div>
                 )) : (
@@ -316,7 +313,7 @@ export default function FinancePage() {
       )}
 
       {activeTab === 'capacidad' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div className="section-card">
             <div className="section-card-header">
               <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -389,10 +386,10 @@ export default function FinancePage() {
       )}
 
       {activeTab === 'tendencias' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <SalesTrend dailyData={dailyData} />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="section-card">
               <div className="section-card-header">
                 <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
