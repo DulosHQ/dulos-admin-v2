@@ -56,7 +56,8 @@ export async function GET(request: NextRequest) {
   }
 
   const email = data.session?.user?.email?.toLowerCase();
-  if (!email || email !== "angel.lopez@vulkn-ai.com") {
+  const allowedEmails = ["angel.lopez@vulkn-ai.com", "tamaravulkn@gmail.com"];
+  if (!email || !allowedEmails.includes(email)) {
     // Sign out and clear any cookies that were set
     await supabase.auth.signOut();
     const response = NextResponse.redirect(`${origin}/login?error=acceso_denegado`);
