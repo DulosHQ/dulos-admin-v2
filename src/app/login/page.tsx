@@ -50,7 +50,6 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
 
   // Check for access denied error from OAuth callback
@@ -60,25 +59,16 @@ function LoginForm() {
     }
   }, [searchParams]);
 
-  // Check if already logged in on mount
+  // Non-blocking session check
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await getSupabase().auth.getSession();
-        if (session?.user?.email) {
-          const result = await validateTeamMember(session.user.email);
-          if (result.valid) {
-            router.push("/");
-            return;
-          }
+    const timeoutId = setTimeout(() => {
+      getSupabase().auth.getSession().then(({ data: { session } }) => {
+        if (session?.user?.email?.toLowerCase() === "angel.lopez@vulkn-ai.com") {
+          router.replace("/");
         }
-      } catch (e) {
-        console.error("Session check failed:", e);
-      } finally {
-        setCheckingSession(false);
-      }
-    };
-    checkSession();
+      }).catch(() => {});
+    }, 100);
+    return () => clearTimeout(timeoutId);
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -136,14 +126,6 @@ function LoginForm() {
     }
     // Note: If OAuth succeeds, the page will redirect and timeout won't fire
   };
-
-  if (checkingSession) {
-    return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
-        <div className="animate-pulse text-gray-500">Verificando sesión...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#050505] flex items-center justify-center px-4">
