@@ -196,9 +196,9 @@ export default function OpsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f8f6f6] p-6">
+      <div className="bg-[#f8f6f6] p-4">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">Operaciones</h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-4">Operaciones</h1>
           <div className="space-y-4">
             {[1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)}
           </div>
@@ -208,11 +208,11 @@ export default function OpsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f6f6] p-6">
+    <div className="bg-[#f8f6f6] p-4">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Operaciones</h1>
+        <h1 className="text-xl font-bold text-gray-900 mb-4">Operaciones</h1>
 
-        <div className="border-b border-gray-200 mb-6">
+        <div className="border-b border-gray-200 mb-4">
           <nav className="flex gap-1">
             {tabs.map(tab => (
               <button

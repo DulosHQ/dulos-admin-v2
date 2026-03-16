@@ -90,8 +90,8 @@ export default function AdminPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#f8f6f6] p-6 max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Administracion</h1>
+    <div className="bg-[#f8f6f6] p-4 max-w-6xl mx-auto">
+      <h1 className="text-xl font-bold mb-3">Administracion</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Team */}
