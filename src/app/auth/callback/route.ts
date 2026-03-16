@@ -1,16 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
-export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get("code");
+export async function GET(request: NextRequest) {
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get("code");
+  const origin = requestUrl.origin;
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=no_code`);
   }
 
-  const cookieStore = await cookies();
+  // Create redirect response FIRST so we can set cookies on it
   const response = NextResponse.redirect(`${origin}/`);
 
   const supabase = createServerClient(
@@ -19,12 +19,12 @@ export async function GET(request: Request) {
     {
       cookies: {
         getAll() {
-          return cookieStore.getAll();
+          // Read from the incoming request
+          return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
+          // Write directly to the redirect response
           cookiesToSet.forEach(({ name, value, options }) => {
-            // Write cookies to BOTH the request store AND the response
-            cookieStore.set(name, value, options);
             response.cookies.set(name, value, options);
           });
         },
@@ -38,13 +38,11 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=auth_failed`);
   }
 
-  // SECURITY: Only angel.lopez@vulkn-ai.com
-  const userEmail = data.user.email.toLowerCase();
-  if (userEmail !== "angel.lopez@vulkn-ai.com") {
-    await supabase.auth.signOut();
+  // HARDLOCK: solo angel.lopez@vulkn-ai.com
+  if (data.user.email.toLowerCase() !== "angel.lopez@vulkn-ai.com") {
     return NextResponse.redirect(`${origin}/login?error=acceso_denegado`);
   }
 
-  // Return response WITH cookies already set
+  // Return redirect response WITH session cookies attached
   return response;
 }
