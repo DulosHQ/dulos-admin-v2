@@ -213,19 +213,20 @@ export default function SummaryPage() {
             {funcionesProximas.map((f) => {
               const hasAlert = alertas.some(a => a.mensaje.toLowerCase().includes(f.nombre.toLowerCase()));
               return (
-                <div key={f.id} className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all hover:shadow-sm ${hasAlert ? 'border-red-200 bg-red-50/30' : 'border-gray-100 bg-white'}`}>
-                  {f.image_url ? (
-                    <img src={f.image_url} alt="" className="w-[72px] h-[72px] rounded-xl object-cover flex-shrink-0 shadow-sm" />
-                  ) : (
-                    <div className="w-[72px] h-[72px] rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 text-2xl">🎭</div>
-                  )}
-                  <div className="flex-1 min-w-0 py-0.5">
+                <div key={f.id} className={`flex items-stretch gap-3 p-2 rounded-xl border transition-all hover:shadow-sm ${hasAlert ? 'border-red-200 bg-red-50/30' : 'border-gray-100 bg-white'}`}>
+                  <div className="flex items-center flex-shrink-0">
+                    {f.image_url ? (
+                      <img src={f.image_url} alt="" className="w-[68px] h-[68px] rounded-xl object-cover shadow-sm" />
+                    ) : (
+                      <div className="w-[68px] h-[68px] rounded-xl bg-gray-100 flex items-center justify-center text-2xl">🎭</div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 flex flex-col justify-center">
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-bold text-gray-900 text-sm truncate leading-tight">{f.nombre}</p>
                       <span className={`text-sm font-extrabold flex-shrink-0 ${f.ocupacion >= 80 ? 'text-red-500' : f.ocupacion >= 50 ? 'text-amber-500' : 'text-gray-300'}`}>{f.ocupacion}%</span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5 truncate">{f.hora}</p>
-                    <p className="text-xs text-gray-400 truncate">{f.sala}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 truncate">{f.hora} · {f.sala}</p>
                     <p className={`text-xs font-semibold mt-0.5 ${f.available < 50 ? 'text-red-500' : 'text-emerald-600'}`}>{f.available} disponibles</p>
                   </div>
                 </div>
