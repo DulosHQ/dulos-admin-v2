@@ -378,7 +378,16 @@ export default function EventsPage() {
                                 className="border-b border-gray-200 last:border-b-0"
                               >
                                 <td className="px-4 py-3 font-medium text-gray-900">
-                                  {event.name}
+                                  <div className="flex items-center gap-2">
+                                    {event.image_url ? (
+                                      <img src={event.image_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+                                    ) : (
+                                      <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                        <span className="text-gray-400 text-xs">🎭</span>
+                                      </div>
+                                    )}
+                                    {event.name}
+                                  </div>
                                 </td>
                                 <td className="px-4 py-3 text-gray-600">
                                   {formatDate(event.date)}
@@ -415,12 +424,12 @@ export default function EventsPage() {
                                 </td>
                               </tr>
                               {expandedEventIds.includes(event.id) && (
-                                <tr><td colSpan={6} className="bg-white p-4">
-                                  <div className="space-y-6">
-                                    {/* Ordenes Recientes */}
-                                    <div className="rounded-xl bg-white border border-gray-200 p-4">
+                                <tr><td colSpan={6} className="bg-white p-3">
+                                  <div className="space-y-3">
+                                    {/* Ordenes Recientes - only show if orders exist */}
+                                    {event.orders.length > 0 && (
+                                    <div className="rounded-xl bg-white border border-gray-200 p-3">
                                       <h4 className="font-semibold text-gray-900 mb-3">Ordenes recientes</h4>
-                                      {event.orders.length > 0 ? (
                                         <div className="overflow-x-auto">
                                           <table className="w-full text-sm">
                                             <thead><tr className="text-left text-gray-500 border-b">
@@ -435,18 +444,18 @@ export default function EventsPage() {
                                             </tbody>
                                           </table>
                                         </div>
-                                      ) : (
-                                        <p className="text-gray-500 text-sm">No hay ordenes para este evento</p>
-                                      )}
                                     </div>
+                                    )}
+                                    {/* Zonas + Funciones side by side */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                                     {/* Zonas */}
-                                    <div className="rounded-xl bg-white border border-gray-200 p-4">
+                                    <div className="rounded-xl bg-white border border-gray-200 p-3">
                                       <div className="flex justify-between items-center mb-3">
                                         <h4 className="font-semibold text-gray-900">Zonas</h4>
                                         <button onClick={() => alert('Agregar zona')} className="text-sm text-[#E63946] font-medium hover:underline">+ Agregar Zona</button>
                                       </div>
                                       {event.zones.length > 0 ? (
-                                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                        <div className="grid gap-3">
                                           {event.zones.map((z) => {
                                             const pct = z.capacidad > 0 ? (z.vendidos / z.capacidad) * 100 : 0;
                                             return (
@@ -463,7 +472,7 @@ export default function EventsPage() {
                                       )}
                                     </div>
                                     {/* Funciones */}
-                                    <div className="rounded-xl bg-white border border-gray-200 p-4">
+                                    <div className="rounded-xl bg-white border border-gray-200 p-3">
                                       <div className="flex justify-between items-center mb-3">
                                         <h4 className="font-semibold text-gray-900">Funciones</h4>
                                         <button onClick={() => alert('Agregar funcion')} className="text-sm text-[#E63946] font-medium hover:underline">+ Agregar Funcion</button>
@@ -486,6 +495,7 @@ export default function EventsPage() {
                                       ) : (
                                         <p className="text-gray-500 text-sm">No hay funciones programadas</p>
                                       )}
+                                    </div>
                                     </div>
                                   </div>
                                 </td></tr>
