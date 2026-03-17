@@ -8,12 +8,20 @@ import {
   fetchTickets,
   fetchNotificationLogs,
   fetchAllEvents,
+  fetchTicketRecovery,
+  fetchAllEscalations,
+  fetchCustomersSearchPaginated,
+  fetchCustomerHistory,
+  searchCustomerByNameOrEmail,
   Checkin,
   Coupon,
   Ticket,
   Customer,
   AuditLog,
-  DulosEvent
+  DulosEvent,
+  TicketRecovery,
+  Escalation,
+  CustomerHistory,
 } from '../lib/supabase'
 import { createCoupon as createCouponAction } from '../app/actions/coupons.actions'
 import { couponSchema } from '../lib/validations/coupons.schema'
@@ -105,11 +113,17 @@ export default function OpsPage() {
   const [notifFilter, setNotifFilter] = useState(false)
 
   // Customer history drill-down
-  const [customerHistory, setCustomerHistory] = useState<any[]>([])
+  const [customerHistory, setCustomerHistory] = useState<CustomerHistory[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
 
-  // Helper to search customers
-  const { searchCustomerByNameOrEmail, fetchCustomerHistory } = require('../lib/supabase')
+  // Server-side paginated customers
+  const [customerPage, setCustomerPage] = useState(1)
+  const [customerTotal, setCustomerTotal] = useState(0)
+  const [customerPageSize] = useState(20)
+
+  // Ticket recovery & escalations
+  const [ticketRecovery, setTicketRecovery] = useState<TicketRecovery[]>([])
+  const [escalations, setEscalations] = useState<Escalation[]>([])
 
   useEffect(() => {
     Promise.all([
@@ -118,22 +132,27 @@ export default function OpsPage() {
       fetchTickets().catch(() => []),
       fetchNotificationLogs().catch(() => []),
       fetchAllEvents().catch(() => []),
-    ]).then(([ci, co, tk, nl, ev]) => {
+      fetchTicketRecovery().catch(() => []),
+      fetchAllEscalations().catch(() => []),
+    ]).then(([ci, co, tk, nl, ev, tr, esc]) => {
       setCheckins(ci.filter((c: Checkin) => c.customer_name && c.customer_name !== 'DUPLICADO'))
       setCupones(co)
       setTickets(tk)
       setNotificationLogs(nl)
       setEvents(ev)
+      setTicketRecovery(tr)
+      setEscalations(esc)
       setLoading(false)
     })
   }, [])
 
-  // Customer search function
-  const handleCustomerSearch = async () => {
-    if (!customerSearch.trim()) return
+  // Customer search function — server-side paginated
+  const handleCustomerSearch = async (page: number = 1) => {
     try {
-      const results = await searchCustomerByNameOrEmail(customerSearch.trim())
-      setSearchResults(results)
+      const { data, count } = await fetchCustomersSearchPaginated(customerSearch.trim(), page, customerPageSize)
+      setSearchResults(data)
+      setCustomerTotal(count)
+      setCustomerPage(page)
       setExpandedCustomer(null)
       setCustomerHistory([])
     } catch (error) {
@@ -141,6 +160,14 @@ export default function OpsPage() {
       toast.error('Error al buscar clientes')
     }
   }
+
+  // Load initial customers on mount
+  useEffect(() => {
+    if (!loading) {
+      handleCustomerSearch(1)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
 
   // Fetch customer history on expand
   const handleExpandCustomer = async (customerId: string) => {
@@ -321,7 +348,7 @@ export default function OpsPage() {
       {/* Sub-tabs Navigation */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="flex border-b border-gray-200">
-          {['checkins', 'reservas', 'boletos', 'clientes', 'cupones'].map((tab) => (
+          {['checkins', 'clientes', 'cupones', 'recovery', 'escalaciones'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -332,10 +359,10 @@ export default function OpsPage() {
               }`}
             >
               {tab === 'checkins' ? 'Check-ins' :
-               tab === 'reservas' ? 'Reservas' :
-               tab === 'boletos' ? 'Boletos' :
-               tab === 'clientes' ? 'Clientes' :
-               'Cupones'}
+               tab === 'clientes' ? `Clientes (${customerTotal.toLocaleString()})` :
+               tab === 'cupones' ? 'Cupones' :
+               tab === 'recovery' ? `Recovery (${ticketRecovery.length})` :
+               `Escalaciones (${escalations.length})`}
             </button>
           ))}
         </div>
@@ -703,12 +730,12 @@ export default function OpsPage() {
                   type="text"
                   value={customerSearch}
                   onChange={e => setCustomerSearch(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleCustomerSearch()}
-                  placeholder="Buscar por nombre o email..."
+                  onKeyDown={e => e.key === 'Enter' && handleCustomerSearch(1)}
+                  placeholder="Buscar por nombre, email o teléfono..."
                   className="flex-1 px-3 py-1.5 border border-gray-200 rounded text-xs sm:text-sm focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
                 />
                 <button
-                  onClick={handleCustomerSearch}
+                  onClick={() => handleCustomerSearch(1)}
                   className="px-3 py-1.5 bg-[#EF4444] text-white rounded text-xs sm:text-sm font-bold hover:bg-red-600"
                 >
                   Buscar
@@ -809,6 +836,31 @@ export default function OpsPage() {
                 </div>
               )}
 
+              {/* Server-side pagination */}
+              {customerTotal > customerPageSize && (
+                <div className="flex items-center justify-between pt-2 text-xs text-gray-500">
+                  <span>
+                    {((customerPage - 1) * customerPageSize) + 1}-{Math.min(customerPage * customerPageSize, customerTotal)} de {customerTotal.toLocaleString()} clientes
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleCustomerSearch(customerPage - 1)}
+                      disabled={customerPage <= 1}
+                      className="px-3 py-1.5 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 font-bold"
+                    >
+                      Anterior
+                    </button>
+                    <button
+                      onClick={() => handleCustomerSearch(customerPage + 1)}
+                      disabled={customerPage * customerPageSize >= customerTotal}
+                      className="px-3 py-1.5 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 font-bold"
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {customerSearch && searchResults.length === 0 && (
                 <p className="text-center text-gray-500 text-sm py-4">No se encontraron clientes</p>
               )}
@@ -871,6 +923,78 @@ export default function OpsPage() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Recovery Tab */}
+          {activeTab === 'recovery' && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-[#1E293B]">Recuperación de Boletos</h2>
+              {ticketRecovery.length > 0 ? (
+                <div className="space-y-3">
+                  {ticketRecovery.map(tr => (
+                    <div key={tr.id} className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="font-bold text-sm text-gray-900">{tr.customer_name}</p>
+                          <p className="text-xs text-gray-500">{tr.customer_email}</p>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${
+                          tr.status === 'completed' ? 'bg-green-500' :
+                          tr.status === 'sent' ? 'bg-blue-500' :
+                          'bg-yellow-500'
+                        }`}>
+                          {tr.status === 'completed' ? 'Completado' :
+                           tr.status === 'sent' ? 'Enviado' : 'Pendiente'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600">Evento: <span className="font-bold">{tr.event_name}</span></p>
+                      <p className="text-xs text-gray-500">Canal: {tr.channel} · {new Date(tr.created_at).toLocaleDateString('es-MX')}</p>
+                      {tr.notes && <p className="text-xs text-gray-400 mt-1 italic">{tr.notes}</p>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-2xl mb-2">✅</p>
+                  <p>No hay casos de recuperación pendientes</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Escalaciones Tab */}
+          {activeTab === 'escalaciones' && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-[#1E293B]">Escalaciones</h2>
+              {escalations.length > 0 ? (
+                <div className="space-y-3">
+                  {escalations.map(esc => (
+                    <div key={esc.id} className={`bg-white rounded-lg p-4 border ${esc.resolved ? 'border-green-200' : 'border-red-200'}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="font-bold text-sm text-gray-900">{esc.reason}</p>
+                          <p className="text-xs text-gray-500">{esc.event_mentioned}</p>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${
+                          esc.resolved ? 'bg-green-500' : 'bg-red-500'
+                        }`}>
+                          {esc.resolved ? 'Resuelto' : 'Pendiente'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600">{esc.description}</p>
+                      {esc.situation && <p className="text-xs text-gray-500 mt-1">Situación: {esc.situation}</p>}
+                      <p className="text-xs text-gray-400 mt-1">{new Date(esc.created_at).toLocaleDateString('es-MX')}</p>
+                      {esc.resolved_at && <p className="text-xs text-green-600">Resuelto: {new Date(esc.resolved_at).toLocaleDateString('es-MX')}</p>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-2xl mb-2">✅</p>
+                  <p>No hay escalaciones pendientes</p>
+                </div>
+              )}
             </div>
           )}
         </div>

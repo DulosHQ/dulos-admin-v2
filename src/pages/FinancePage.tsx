@@ -108,6 +108,29 @@ export default function FinancePage() {
   const [dateRange, setDateRange] = useState<DateRange>('all');
   const [loading, setLoading] = useState(true);
 
+  // "Aplicar Filtros" pattern: pending state until user clicks "Aplicar"
+  const [pendingEvent, setPendingEvent] = useState('');
+  const [pendingDateRange, setPendingDateRange] = useState<DateRange>('all');
+  const [filtersApplied, setFiltersApplied] = useState(false);
+
+  const applyFilters = () => {
+    setSelectedEvent(pendingEvent);
+    setDateRange(pendingDateRange);
+    setFiltersApplied(true);
+    setTxPage(0);
+  };
+
+  const clearFilters = () => {
+    setPendingEvent('');
+    setPendingDateRange('all');
+    setSelectedEvent('');
+    setDateRange('all');
+    setFiltersApplied(false);
+    setTxPage(0);
+  };
+
+  const hasFilterChanges = pendingEvent !== selectedEvent || pendingDateRange !== dateRange;
+
   // Raw data
   const [events, setEvents] = useState<DulosEvent[]>([]);
   const [rawZones, setRawZones] = useState<TicketZone[]>([]);
@@ -548,14 +571,14 @@ export default function FinancePage() {
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Metricas de ingresos, capacidad y tendencias</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {/* Date range presets */}
+          {/* Date range presets — pending until "Aplicar" */}
           <div className="flex rounded-lg overflow-hidden border border-gray-200">
             {dateRangeOptions.map(opt => (
               <button
                 key={opt.key}
-                onClick={() => setDateRange(opt.key)}
+                onClick={() => setPendingDateRange(opt.key)}
                 className={`px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
-                  dateRange === opt.key
+                  pendingDateRange === opt.key
                     ? 'bg-[#1E293B] text-white'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
@@ -565,10 +588,10 @@ export default function FinancePage() {
             ))}
           </div>
 
-          {/* Event dropdown */}
+          {/* Event dropdown — pending until "Aplicar" */}
           <select
-            value={selectedEvent}
-            onChange={e => setSelectedEvent(e.target.value)}
+            value={pendingEvent}
+            onChange={e => setPendingEvent(e.target.value)}
             className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-[#EF4444] focus:border-[#EF4444]"
           >
             <option value="">Todos los Eventos</option>
@@ -576,6 +599,27 @@ export default function FinancePage() {
               <option key={event.id} value={event.id}>{event.name}</option>
             ))}
           </select>
+
+          {/* Aplicar / Limpiar buttons */}
+          <button
+            onClick={applyFilters}
+            disabled={!hasFilterChanges}
+            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-bold transition-colors ${
+              hasFilterChanges
+                ? 'bg-[#EF4444] text-white hover:bg-[#c5303c]'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            Aplicar Filtros
+          </button>
+          {filtersApplied && (
+            <button
+              onClick={clearFilters}
+              className="px-3 py-2 rounded-lg text-xs sm:text-sm font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Limpiar
+            </button>
+          )}
 
           {/* Export */}
           <button

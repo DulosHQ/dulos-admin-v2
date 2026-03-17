@@ -1,28 +1,19 @@
 'use client';
 
-interface TrendData {
-  value: number;
-  isPositive: boolean;
-}
-
-interface MetricData {
+export interface MetricData {
   label: string;
   value: string;
-  trend: TrendData;
-  sparkline: number[];
+  change?: number; // % change vs previous period, positive = good
+  iconKey: string;
 }
 
 interface HeroMetricsProps {
-  revenue: MetricData;
-  tickets: MetricData;
-  occupancy: MetricData;
-  upcoming: MetricData;
-  commission: MetricData;
+  metrics: MetricData[];
 }
 
 /* Premium filled icons — Dulos brand red with gradient depth */
 const METRIC_ICONS: Record<string, React.ReactNode> = {
-  'Ingresos Totales': (
+  revenue: (
     <svg className="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none">
       <defs>
         <linearGradient id="rev" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
@@ -36,7 +27,19 @@ const METRIC_ICONS: Record<string, React.ReactNode> = {
       <circle cx="5.5" cy="8.5" r=".6" fill="#EF4444"/><circle cx="18.5" cy="15.5" r=".6" fill="#EF4444"/>
     </svg>
   ),
-  'Boletos Vendidos': (
+  orders: (
+    <svg className="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none">
+      <defs>
+        <linearGradient id="ord" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#EF4444"/><stop offset="1" stopColor="#C1121F"/>
+        </linearGradient>
+      </defs>
+      <rect x="4" y="3" width="16" height="18" rx="2" fill="url(#ord)" opacity=".12"/>
+      <rect x="4" y="3" width="16" height="18" rx="2" stroke="url(#ord)" strokeWidth="1.4"/>
+      <path d="M8 8h8M8 12h6M8 16h4" stroke="#EF4444" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  ),
+  tickets: (
     <svg className="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none">
       <defs>
         <linearGradient id="tix" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
@@ -50,50 +53,16 @@ const METRIC_ICONS: Record<string, React.ReactNode> = {
       <circle cx="6.5" cy="9" r=".5" fill="#EF4444"/><circle cx="6.5" cy="12" r=".5" fill="#EF4444"/><circle cx="6.5" cy="15" r=".5" fill="#EF4444"/>
     </svg>
   ),
-  'Ocupación Promedio': (
+  avgPrice: (
     <svg className="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none">
       <defs>
-        <linearGradient id="occ" x1="0" y1="24" x2="24" y2="0" gradientUnits="userSpaceOnUse">
+        <linearGradient id="avg" x1="0" y1="24" x2="24" y2="0" gradientUnits="userSpaceOnUse">
           <stop stopColor="#EF4444" stopOpacity=".6"/><stop offset="1" stopColor="#EF4444"/>
         </linearGradient>
       </defs>
-      <rect x="3" y="14" width="3.5" height="6" rx=".8" fill="url(#occ)" opacity=".25"/>
-      <rect x="8" y="10" width="3.5" height="10" rx=".8" fill="url(#occ)" opacity=".45"/>
-      <rect x="13" y="7" width="3.5" height="13" rx=".8" fill="url(#occ)" opacity=".65"/>
-      <rect x="18" y="3" width="3.5" height="17" rx=".8" fill="url(#occ)" opacity=".9"/>
-      <path d="M3 20.5h18.5" stroke="#EF4444" strokeWidth="1.2" strokeLinecap="round"/>
-    </svg>
-  ),
-  'Funciones Próximas': (
-    <svg className="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none">
-      <defs>
-        <linearGradient id="cal" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#EF4444"/><stop offset="1" stopColor="#C1121F"/>
-        </linearGradient>
-      </defs>
-      <rect x="3" y="5.5" width="18" height="15" rx="2.5" fill="url(#cal)" opacity=".1"/>
-      <rect x="3" y="5.5" width="18" height="15" rx="2.5" stroke="url(#cal)" strokeWidth="1.4"/>
-      <rect x="3" y="5.5" width="18" height="4.5" rx="2.5" fill="#EF4444" opacity=".9"/>
-      <path d="M8 3.5v3m8-3v3" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round"/>
-      <rect x="6.5" y="13" width="2.2" height="2.2" rx=".5" fill="#EF4444" opacity=".6"/>
-      <rect x="10.9" y="13" width="2.2" height="2.2" rx=".5" fill="#EF4444"/>
-      <rect x="15.3" y="13" width="2.2" height="2.2" rx=".5" fill="#EF4444" opacity=".35"/>
-      <rect x="6.5" y="16.5" width="2.2" height="2.2" rx=".5" fill="#EF4444" opacity=".2"/>
-      <rect x="10.9" y="16.5" width="2.2" height="2.2" rx=".5" fill="#EF4444" opacity=".2"/>
-      <rect x="15.3" y="16.5" width="2.2" height="2.2" rx=".5" fill="#EF4444" opacity=".2"/>
-    </svg>
-  ),
-  'Comisión Dulos': (
-    <svg className="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none">
-      <defs>
-        <linearGradient id="comm" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#EF4444"/><stop offset="1" stopColor="#C1121F"/>
-        </linearGradient>
-      </defs>
-      <path d="M12 2.5L3.5 6v4.5c0 5.5 3.5 10.5 8.5 11 5-0.5 8.5-5.5 8.5-11V6L12 2.5z" fill="url(#comm)" opacity=".12"/>
-      <path d="M12 2.5L3.5 6v4.5c0 5.5 3.5 10.5 8.5 11 5-0.5 8.5-5.5 8.5-11V6L12 2.5z" stroke="url(#comm)" strokeWidth="1.4"/>
-      <path d="M8.5 11.5L11 14l4.5-4.5" stroke="#EF4444" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-      <circle cx="12" cy="8" r="1.5" fill="#EF4444" opacity=".8"/>
+      <circle cx="12" cy="12" r="9" fill="url(#avg)" opacity=".12"/>
+      <circle cx="12" cy="12" r="9" stroke="url(#avg)" strokeWidth="1.4"/>
+      <path d="M12 7v1m0 8v1m-2.5-7.5c.3-.6.9-1 1.8-1 1.2 0 2 .6 2 1.4 0 .8-.6 1.2-2 1.2-1.3 0-2 .5-2 1.3 0 .8.8 1.4 2 1.4.9 0 1.5-.4 1.8-1" stroke="#EF4444" strokeWidth="1.2" strokeLinecap="round"/>
     </svg>
   ),
 };
@@ -105,26 +74,35 @@ const DEFAULT_ICON = (
 );
 
 function MetricCard({ metric }: { metric: MetricData }) {
-  const icon = METRIC_ICONS[metric.label] || DEFAULT_ICON;
+  const icon = METRIC_ICONS[metric.iconKey] || DEFAULT_ICON;
+  const hasChange = metric.change !== undefined && metric.change !== 0;
+  const isPositive = (metric.change ?? 0) > 0;
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
       <div className="flex items-center gap-1.5 mb-2">
         <div className="w-6 h-6 flex items-center justify-center">{icon}</div>
         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{metric.label}</p>
       </div>
-      <p className="text-3xl font-black text-gray-900 tracking-tight leading-none">{metric.value}</p>
+      <p className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight leading-none">{metric.value}</p>
+      {hasChange && (
+        <div className="mt-1.5">
+          <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-bold ${isPositive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+            {isPositive ? '+' : ''}{metric.change?.toFixed(1)}% vs período anterior
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
-export default function HeroMetrics({ revenue, tickets, occupancy, upcoming, commission }: HeroMetricsProps) {
+export default function HeroMetrics({ metrics }: HeroMetricsProps) {
+  const cols = metrics.length <= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-5';
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4">
-      <MetricCard metric={revenue} />
-      <MetricCard metric={tickets} />
-      <MetricCard metric={occupancy} />
-      <MetricCard metric={upcoming} />
-      <MetricCard metric={commission} />
+    <div className={`grid grid-cols-2 md:grid-cols-2 ${cols} gap-3 lg:gap-4`}>
+      {metrics.map((m) => (
+        <MetricCard key={m.iconKey} metric={m} />
+      ))}
     </div>
   );
 }

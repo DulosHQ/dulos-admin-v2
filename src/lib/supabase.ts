@@ -103,11 +103,16 @@ export interface Order {
 }
 
 export interface Escalation {
+  id: string;
   client_id: string;
+  description: string;
   reason: string;
   event_mentioned: string;
   situation: string;
+  status: string;
   resolved: boolean;
+  resolved_at: string | null;
+  created_at: string;
 }
 
 export interface Customer {
@@ -236,16 +241,21 @@ export interface EventDashboard {
 
 export interface CustomerHistory {
   customer_id: string;
-  customer_name: string;
-  customer_email: string;
-  order_id: string;
+  full_name: string;
+  phone: string;
+  email: string;
+  total_purchases: number;
+  total_spent: number;
+  is_vip: boolean;
   order_number: string;
   event_name: string;
+  venue_name: string;
   zone_name: string;
   quantity: number;
   total_price: number;
-  purchased_at: string;
-  ticket_status: string;
+  payment_status: string;
+  ticket_used: boolean;
+  event_date: string;
 }
 
 // New table interfaces (empty but ready)
@@ -301,9 +311,13 @@ export interface GtmEvent {
 
 export interface TicketRecovery {
   id: string;
-  order_id: string;
+  ticket_id: string;
+  customer_name: string;
   customer_email: string;
+  event_name: string;
   status: string;
+  channel: string;
+  notes: string;
   created_at: string;
 }
 
@@ -457,7 +471,7 @@ export async function fetchCheckins(): Promise<Checkin[]> {
 
 export async function fetchAuditLogs(): Promise<AuditLog[]> {
   try {
-    return await supabaseFetch<AuditLog[]>('audit_logs?order=created_at.desc&limit=20');
+    return await supabaseFetch<AuditLog[]>('audit_logs?order=created_at.desc&limit=100');
   } catch (error) {
     console.error('Error fetching audit logs:', error);
     throw error;
@@ -663,6 +677,99 @@ export async function fetchCustomersPaginated(page: number = 1, pageSize: number
     return { data, count };
   } catch (error) {
     console.error('Error fetching paginated customers:', error);
+    throw error;
+  }
+}
+
+// Server-side paginated customer search
+export async function fetchCustomersSearchPaginated(
+  search: string,
+  page: number = 1,
+  pageSize: number = 20
+): Promise<{ data: Customer[]; count: number }> {
+  try {
+    const offset = (page - 1) * pageSize;
+    const searchFilter = search
+      ? `&or=(name.ilike.*${encodeURIComponent(search)}*,email.ilike.*${encodeURIComponent(search)}*,phone.ilike.*${encodeURIComponent(search)}*)`
+      : '';
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/customers?order=total_spent.desc&limit=${pageSize}&offset=${offset}${searchFilter}`,
+      {
+        headers: {
+          ...headers,
+          'Prefer': 'count=exact',
+        },
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`Supabase error: ${response.status} ${response.statusText}`);
+    }
+    const contentRange = response.headers.get('content-range');
+    const count = contentRange ? parseInt(contentRange.split('/')[1] || '0') : 0;
+    const data = await response.json();
+    return { data, count };
+  } catch (error) {
+    console.error('Error searching customers:', error);
+    throw error;
+  }
+}
+
+// Server-side paginated transactions (orders) with sorting and filters
+export async function fetchTransactionsPaginated(
+  page: number = 1,
+  pageSize: number = 10,
+  sortColumn: string = 'purchased_at',
+  sortDirection: 'asc' | 'desc' = 'desc',
+  eventFilter?: string,
+  statusFilter?: string,
+  search?: string
+): Promise<{ data: Order[]; count: number }> {
+  try {
+    const offset = (page - 1) * pageSize;
+    let filters = '';
+    if (eventFilter) filters += `&event_id=eq.${encodeURIComponent(eventFilter)}`;
+    if (statusFilter) filters += `&payment_status=eq.${encodeURIComponent(statusFilter)}`;
+    if (search) {
+      filters += `&or=(customer_name.ilike.*${encodeURIComponent(search)}*,customer_email.ilike.*${encodeURIComponent(search)}*,order_number.ilike.*${encodeURIComponent(search)}*)`;
+    }
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/orders?order=${sortColumn}.${sortDirection}&limit=${pageSize}&offset=${offset}${filters}`,
+      {
+        headers: {
+          ...headers,
+          'Prefer': 'count=exact',
+        },
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`Supabase error: ${response.status} ${response.statusText}`);
+    }
+    const contentRange = response.headers.get('content-range');
+    const count = contentRange ? parseInt(contentRange.split('/')[1] || '0') : 0;
+    const data = await response.json();
+    return { data, count };
+  } catch (error) {
+    console.error('Error fetching paginated transactions:', error);
+    throw error;
+  }
+}
+
+// Fetch ticket recovery cases
+export async function fetchTicketRecovery(): Promise<TicketRecovery[]> {
+  try {
+    return await supabaseFetch<TicketRecovery[]>('ticket_recovery?order=created_at.desc');
+  } catch (error) {
+    console.error('Error fetching ticket recovery:', error);
+    throw error;
+  }
+}
+
+// Fetch all escalations (including resolved)
+export async function fetchAllEscalations(): Promise<Escalation[]> {
+  try {
+    return await supabaseFetch<Escalation[]>('escalations?order=created_at.desc');
+  } catch (error) {
+    console.error('Error fetching all escalations:', error);
     throw error;
   }
 }
