@@ -290,7 +290,7 @@ export default function SummaryPage() {
           };
         }));
 
-        // Activity — enriched with amounts and icons
+        // Activity — populated from available data (tickets, checkins, salesSummary)
         const actividades: Actividad[] = [];
         const seen = new Set<string>();
 
@@ -301,44 +301,67 @@ export default function SummaryPage() {
           zonePriceMap.set(key, z.price);
         });
 
-        orders.filter(o => o.customer_name && o.customer_name !== 'null').slice(0, 20).forEach((o) => {
-          const eventName = eventMap.get(o.event_id)?.name || o.event_id;
-          const key = `${o.customer_name}-${eventName}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            const price = zonePriceMap.get(`${o.event_id}-${o.zone_name}`) || 0;
-            actividades.push({
-              id: `or-${o.order_number}`,
-              tipo: 'venta',
-              mensaje: `${o.customer_name} \u2192 ${eventName}`,
-              tiempo: formatTimeAgo(o.purchased_at),
-              monto: price > 0 ? price * o.quantity : undefined,
-            });
-          }
-        });
-
-        checkins.filter(c => c.customer_name && c.customer_name !== 'DUPLICADO').slice(0, 10).forEach((c) => {
-          const key = `${c.customer_name}-${c.event_name}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            actividades.push({
-              id: `ci-${c.id}`,
-              tipo: 'checkin',
-              mensaje: `${c.customer_name} \u2192 ${c.event_name}`,
-              tiempo: formatTimeAgo(c.scanned_at),
-            });
-          }
-        });
-
-        // Add fallback if no activities
-        if (actividades.length === 0) {
-          actividades.push({
-            id: 'empty',
-            tipo: 'info',
-            mensaje: 'Sin actividad reciente',
-            tiempo: '',
+        // 1. Recent ticket sales (from dulos_tickets - 946 rows available)
+        tickets
+          .filter(t => t.customer_name && t.created_at)
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .slice(0, 15)
+          .forEach((ticket) => {
+            const eventName = eventMap.get(ticket.event_id)?.name || ticket.event_id;
+            const key = `ticket-${ticket.customer_name}-${ticket.event_id}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              const price = zonePriceMap.get(`${ticket.event_id}-${ticket.zone_name}`) || 0;
+              actividades.push({
+                id: `tk-${ticket.id}`,
+                tipo: 'venta',
+                mensaje: `${ticket.customer_name} \u2192 ${eventName}`,
+                tiempo: formatTimeAgo(ticket.created_at),
+                monto: price > 0 ? price : undefined,
+              });
+            }
           });
-        }
+
+        // 2. Recent checkins (from dulos_checkins - 8 rows available)
+        checkins
+          .filter(c => c.customer_name && c.customer_name !== 'DUPLICADO' && c.scanned_at)
+          .sort((a, b) => new Date(b.scanned_at).getTime() - new Date(a.scanned_at).getTime())
+          .forEach((checkin) => {
+            const key = `checkin-${checkin.customer_name}-${checkin.event_name}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              actividades.push({
+                id: `ci-${checkin.id}`,
+                tipo: 'checkin',
+                mensaje: `${checkin.customer_name} \u2192 ${checkin.event_name}`,
+                tiempo: formatTimeAgo(checkin.scanned_at),
+              });
+            }
+          });
+
+        // 3. Sales summary activity (recent event performance)
+        salesData
+          .filter(s => s.total_orders > 0)
+          .slice(0, 5)
+          .forEach((sale, idx) => {
+            const eventName = eventMap.get(sale.event_id)?.name || sale.event_id;
+            if (eventName && sale.total_revenue > 0) {
+              actividades.push({
+                id: `sale-${idx}`,
+                tipo: 'venta',
+                mensaje: `${eventName} — ${sale.total_orders} órdenes`,
+                tiempo: 'reciente',
+                monto: sale.total_revenue,
+              });
+            }
+          });
+
+        // Sort all activities by recency (real timestamps first, then "reciente")
+        actividades.sort((a, b) => {
+          if (a.tiempo === 'reciente' && b.tiempo !== 'reciente') return 1;
+          if (a.tiempo !== 'reciente' && b.tiempo === 'reciente') return -1;
+          return 0;
+        });
 
         setAllActividad(actividades);
         setActividadReciente(actividades.slice(0, 6));
