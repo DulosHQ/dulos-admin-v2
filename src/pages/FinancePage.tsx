@@ -14,13 +14,16 @@ import {
   fetchAllEvents,
   fetchTickets,
   fetchRevenueByEvent,
+  fetchSalesSummary,
+  fetchPedidos,
   DulosEvent,
   TicketZone,
   Ticket,
   Schedule,
+  SalesSummary,
 } from '../lib/supabase';
 
-type TabKey = 'ingresos' | 'capacidad' | 'tendencias' | 'transacciones';
+type TabKey = 'ingresos' | 'capacidad' | 'tendencias' | 'transacciones' | 'comisiones';
 type DateRange = '7d' | '30d' | '90d' | 'all';
 
 interface ScheduleDisplay {
@@ -53,6 +56,7 @@ const tabs: { key: TabKey; label: string }[] = [
   { key: 'capacidad', label: 'Capacidad' },
   { key: 'tendencias', label: 'Tendencias' },
   { key: 'transacciones', label: 'Transacciones' },
+  { key: 'comisiones', label: 'Comisiones' },
 ];
 
 const dateRangeOptions: { key: DateRange; label: string }[] = [
@@ -111,6 +115,8 @@ export default function FinancePage() {
   const [rawTickets, setRawTickets] = useState<Ticket[]>([]);
   const [rawSchedules, setRawSchedules] = useState<Schedule[]>([]);
   const [rawEventRevenues, setRawEventRevenues] = useState<{ event_id: string; event_name: string; revenue: number; image_url?: string }[]>([]);
+  const [salesSummary, setSalesSummary] = useState<SalesSummary[]>([]);
+  const [pedidosData, setPedidosData] = useState<{ headers: string[]; rows: any[]; totalRows: number }>({ headers: [], rows: [], totalRows: 0 });
 
   // UI state
   const [expandedCapacity, setExpandedCapacity] = useState<number | null>(null);
@@ -122,19 +128,23 @@ export default function FinancePage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [zones, _orders, schedulesData, eventsData, tickets, revenueByEvent] = await Promise.all([
+        const [zones, _orders, schedulesData, eventsData, tickets, revenueByEvent, salesSummaryData, pedidos] = await Promise.all([
           fetchZones().catch(() => [] as TicketZone[]),
           fetchAllOrders().catch(() => []),
           fetchSchedules().catch(() => [] as Schedule[]),
           fetchAllEvents().catch(() => [] as DulosEvent[]),
           fetchTickets().catch(() => [] as Ticket[]),
           fetchRevenueByEvent().catch(() => []),
+          fetchSalesSummary().catch(() => [] as SalesSummary[]),
+          fetchPedidos().catch(() => ({ headers: [], rows: [], totalRows: 0 })),
         ]);
         setRawZones(zones);
         setRawTickets(tickets);
         setRawSchedules(schedulesData);
         setEvents(eventsData);
         setRawEventRevenues(revenueByEvent);
+        setSalesSummary(salesSummaryData);
+        setPedidosData(pedidos);
       } catch (error) {
         console.error('Error loading finance data:', error);
       } finally {
@@ -149,6 +159,11 @@ export default function FinancePage() {
     if (loading) return null;
 
     const eventMap = new Map(events.map(e => [e.id, e]));
+
+    // Filter sales summary by event first
+    const filteredSalesSummary = selectedEvent
+      ? salesSummary.filter(s => s.event_id === selectedEvent)
+      : salesSummary;
 
     // Zone price lookup
     const zonePriceMap = new Map<string, number>();
@@ -175,25 +190,36 @@ export default function FinancePage() {
     // Filter schedules by event
     const filteredSchedules = selectedEvent ? rawSchedules.filter(s => s.event_id === selectedEvent) : rawSchedules;
 
-    // Event revenues (filtered by event if needed)
-    const eventRevenues = selectedEvent
-      ? rawEventRevenues.filter(r => r.event_id === selectedEvent)
-      : rawEventRevenues;
+    // Event revenues from sales summary (REAL DATA)
+    const eventRevenues = filteredSalesSummary.map(s => ({
+      event_id: s.event_id,
+      event_name: s.event_name,
+      revenue: s.total_revenue,
+      orders: s.total_orders,
+      tickets: s.total_tickets_sold,
+      image_url: eventMap.get(s.event_id)?.image_url
+    })).sort((a, b) => b.revenue - a.revenue);
 
-    // --- Scorecard ---
-    const totalRevenue = filteredZones.reduce((sum, z) => sum + z.sold * z.price, 0);
+    // --- Scorecard using Sales Summary (REAL DATA) ---
+
+    // Use real revenue from v_sales_summary
+    const totalRevenue = filteredSalesSummary.reduce((sum, s) => sum + s.total_revenue, 0);
+    const totalOrders = filteredSalesSummary.reduce((sum, s) => sum + s.total_orders, 0);
+    const totalTicketsSold = filteredSalesSummary.reduce((sum, s) => sum + s.total_tickets_sold, 0);
+
+    // Keep zone-based calculations for occupancy (as per requirements)
     const totalSold = filteredZones.reduce((sum, z) => sum + z.sold, 0);
     const totalAvailable = filteredZones.reduce((sum, z) => sum + z.available + z.sold, 0);
     const occupancyPercent = totalAvailable > 0 ? (totalSold / totalAvailable) * 100 : 0;
-    const aov = totalSold > 0 ? totalRevenue / totalSold : 0;
+    const aov = totalTicketsSold > 0 ? totalRevenue / totalTicketsSold : 0;
 
     const scorecardData = {
       revenue: totalRevenue,
       revenuePrevious: totalRevenue || 1,
       aov,
       aovPrevious: aov || 1,
-      completedOrders: totalSold,
-      completedOrdersPrevious: totalSold || 1,
+      completedOrders: totalOrders,
+      completedOrdersPrevious: totalOrders || 1,
       occupancyPercent,
       occupancyPercentPrevious: occupancyPercent || 1,
     };
@@ -350,6 +376,66 @@ export default function FinancePage() {
 
     const summaryStats = { bestDay, avgTicketPrice, popularEvent, popularZone };
 
+    // --- Commission calculations (15% for Dulos, 85% for producers) ---
+    const totalComissionRevenue = filteredSalesSummary.reduce((sum, s) => sum + s.total_revenue, 0);
+    const dulosCommission = totalComissionRevenue * 0.15;
+    const producerShare = totalComissionRevenue * 0.85;
+
+    const commissionData = {
+      totalRevenue: totalComissionRevenue,
+      dulosCommission,
+      producerShare,
+      events: filteredSalesSummary.map(s => ({
+        event_id: s.event_id,
+        event_name: s.event_name,
+        revenue: s.total_revenue,
+        commission: s.total_revenue * 0.15,
+        producer: s.total_revenue * 0.85,
+        tickets: s.total_tickets_sold,
+        image_url: eventMap.get(s.event_id)?.image_url
+      })).sort((a, b) => b.revenue - a.revenue)
+    };
+
+    // --- Transactions from pedidos data (REAL DATA) ---
+    const transactionsFromPedidos: Transaction[] = [];
+    if (pedidosData.rows && pedidosData.headers) {
+      const idIndex = pedidosData.headers.findIndex(h => h === 'ID Pedido');
+      const eventoIndex = pedidosData.headers.findIndex(h => h === 'Evento');
+      const clienteIndex = pedidosData.headers.findIndex(h => h === 'Cliente');
+      const fechaIndex = pedidosData.headers.findIndex(h => h === 'Fecha');
+      const totalIndex = pedidosData.headers.findIndex(h => h === 'Total');
+
+      pedidosData.rows.forEach(row => {
+        if (!row || !Array.isArray(row)) return;
+
+        const id = row[idIndex] || '';
+        const evento = row[eventoIndex] || '';
+        const clienteData = row[clienteIndex] || '';
+        const fecha = row[fechaIndex] || new Date().toISOString();
+        const totalStr = row[totalIndex] || '$0';
+
+        // Parse cliente (format: "Name\nEmail")
+        const [customerName, customerEmail] = String(clienteData).split('\n');
+
+        // Parse total (format: "$299")
+        const amount = parseFloat(String(totalStr).replace(/[$,]/g, '')) || 0;
+
+        transactionsFromPedidos.push({
+          id: String(id),
+          customer_name: customerName || 'N/A',
+          customer_email: customerEmail || 'N/A',
+          event_name: String(evento),
+          zone_name: 'General', // Default zone since pedidos doesn't have zone info
+          amount,
+          date: fecha,
+          status: 'Completado'
+        });
+      });
+    }
+
+    // Use pedidos transactions if available, fallback to ticket-based transactions
+    const finalTransactions = transactionsFromPedidos.length > 0 ? transactionsFromPedidos : transactions;
+
     return {
       scorecardData,
       eventRevenues,
@@ -360,12 +446,13 @@ export default function FinancePage() {
       schedulesDisplay,
       zonesByEvent,
       capacityStats,
-      transactions,
+      transactions: finalTransactions,
       dayOfWeekData,
       eventOccupancy,
       summaryStats,
+      commissionData,
     };
-  }, [loading, events, rawZones, rawTickets, rawSchedules, rawEventRevenues, selectedEvent, dateRange]);
+  }, [loading, events, rawZones, rawTickets, rawSchedules, rawEventRevenues, salesSummary, pedidosData, selectedEvent, dateRange]);
 
   // Reset txPage when filters change
   useEffect(() => { setTxPage(0); }, [selectedEvent, dateRange, txSearch, txSort]);
@@ -457,7 +544,7 @@ export default function FinancePage() {
 
   if (!computed) return null;
 
-  const { scorecardData, eventRevenues, zoneRevenues, donutData, donutTotal, dailyRevenueData, schedulesDisplay, zonesByEvent, capacityStats, dayOfWeekData, eventOccupancy, summaryStats } = computed;
+  const { scorecardData, eventRevenues, zoneRevenues, donutData, donutTotal, dailyRevenueData, schedulesDisplay, zonesByEvent, capacityStats, dayOfWeekData, eventOccupancy, summaryStats, commissionData } = computed;
 
   return (
     <div className="space-y-4">
@@ -908,6 +995,103 @@ export default function FinancePage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ====== COMISIONES TAB ====== */}
+      {activeTab === 'comisiones' && (
+        <div className="space-y-4 animate-fade-in">
+          {/* Commission Summary Card */}
+          <div className="section-card">
+            <div className="section-card-header">
+              <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="section-card-title">Resumen de Comisiones</span>
+            </div>
+            <div className="section-card-body">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                <div className="metric-card">
+                  <p className="metric-card-title">Total Ingresos</p>
+                  <p className="metric-card-value">{fmtCurrency(commissionData.totalRevenue)}</p>
+                  <p className="metric-card-subtitle">Ingresos totales</p>
+                  <div className="metric-card-icon bg-blue-100">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="metric-card">
+                  <p className="metric-card-title">Comisión Dulos (15%)</p>
+                  <p className="metric-card-value text-[#E63946]">{fmtCurrency(commissionData.dulosCommission)}</p>
+                  <p className="metric-card-subtitle">Para Dulos</p>
+                  <div className="metric-card-icon bg-red-100">
+                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="metric-card">
+                  <p className="metric-card-title">Para Productor (85%)</p>
+                  <p className="metric-card-value text-emerald-600">{fmtCurrency(commissionData.producerShare)}</p>
+                  <p className="metric-card-subtitle">Para productores</p>
+                  <div className="metric-card-icon bg-emerald-100">
+                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Commission Breakdown Table */}
+          <div className="section-card">
+            <div className="section-card-header">
+              <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <span className="section-card-title">Desglose por Evento</span>
+              <span className="ml-auto text-xs sm:text-sm text-gray-500">{commissionData.events.length} eventos</span>
+            </div>
+            <div className="section-card-body p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-[#1E293B]">
+                    <tr>
+                      <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] whitespace-nowrap">Evento</th>
+                      <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] whitespace-nowrap">Ingresos</th>
+                      <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] whitespace-nowrap">Comisión (15%)</th>
+                      <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] whitespace-nowrap">Productor (85%)</th>
+                      <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] whitespace-nowrap">Boletos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {commissionData.events.length > 0 ? commissionData.events.map(event => (
+                      <tr key={event.event_id} className="border-t border-gray-100 hover:bg-gray-50">
+                        <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px]">
+                          <div className="flex items-center gap-2">
+                            {event.image_url && (
+                              <img src={event.image_url} alt={event.event_name} className="w-8 h-8 rounded object-cover" />
+                            )}
+                            <span className="font-bold">{event.event_name}</span>
+                          </div>
+                        </td>
+                        <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] font-bold text-gray-900">{fmtCurrency(event.revenue)}</td>
+                        <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] font-bold text-[#E63946]">{fmtCurrency(event.commission)}</td>
+                        <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] font-bold text-emerald-600">{fmtCurrency(event.producer)}</td>
+                        <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] text-gray-600">{event.tickets.toLocaleString()}</td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-gray-500 text-sm">No hay datos de comisiones disponibles</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       )}
