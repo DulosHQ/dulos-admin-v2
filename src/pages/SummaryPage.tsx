@@ -54,6 +54,9 @@ interface FuncionProxima {
   ocupacion: number;
   available: number;
   image_url: string;
+  revenue: number;
+  orders: number;
+  ticketsSold: number;
 }
 
 interface ZoneDetail {
@@ -257,6 +260,7 @@ export default function SummaryPage() {
               day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
             });
           }
+          const sale = salesSummary.find(s => s.event_id === event.id);
           return {
             id: idx + 1,
             eventId: event.id,
@@ -266,6 +270,9 @@ export default function SummaryPage() {
             ocupacion: total > 0 ? Math.round((sold / total) * 100) : 0,
             available: ez.reduce((s, z) => s + z.available, 0),
             image_url: event.image_url || '',
+            revenue: sale?.total_revenue || 0,
+            orders: sale?.total_orders || 0,
+            ticketsSold: sale?.total_tickets_sold || 0,
           };
         }));
 
@@ -424,44 +431,10 @@ export default function SummaryPage() {
     <div className="space-y-4">
       <HeroMetrics revenue={metrics.revenue} tickets={metrics.tickets} occupancy={metrics.occupancy} upcoming={metrics.upcoming} commission={metrics.commission} />
 
-      {/* Revenue per Event */}
-      {salesSummary.length > 0 && (
-        <div className="section-card">
-          <div className="section-card-header !py-2 !px-3">
-            <span className="font-bold text-gray-900 text-sm">Ingresos por Evento</span>
-          </div>
-          <div className="p-3 space-y-2">
-            {salesSummary
-              .sort((a, b) => b.total_revenue - a.total_revenue)
-              .slice(0, 6)
-              .map((sale, idx) => {
-                const event = allEvents.find((e) => e.id === sale.event_id);
-                return (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-3 p-2 rounded-lg bg-white border border-gray-100 hover:shadow-sm transition-all"
-                  >
-                    {event?.image_url ? (
-                      <img src={event.image_url} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-sm">🎭</div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-gray-900 text-sm truncate">{sale.event_name}</p>
-                      <p className="text-xs text-gray-500">{sale.venue_name}</p>
-                    </div>
-                    <span className="text-sm font-black text-green-600 flex-shrink-0">${sale.total_revenue.toLocaleString()}</span>
-                  </div>
-                );
-              })}
-          </div>
-        </div>
-      )}
-
-      {/* Funciones Próximas */}
+      {/* Eventos — revenue + funciones unificados */}
       <div className="section-card">
         <div className="section-card-header !py-2 !px-3">
-          <span className="font-bold text-gray-900 text-sm">Funciones Próximas</span>
+          <span className="font-bold text-gray-900 text-sm">Eventos</span>
           {alertas.length > 0 && (
             <button
               onClick={() => setAlertsPanelOpen(!alertsPanelOpen)}
@@ -514,8 +487,11 @@ export default function SummaryPage() {
                       <p className="font-extrabold text-gray-900 text-xs sm:text-[13px] truncate leading-tight">{f.nombre}</p>
                       <span className={`text-xs sm:text-[13px] font-black flex-shrink-0 ${f.ocupacion >= 80 ? 'text-red-500' : f.ocupacion >= 50 ? 'text-amber-500' : 'text-gray-300'}`}>{f.ocupacion}%</span>
                     </div>
-                    <p className="text-[11px] sm:text-[12px] text-gray-500 mt-1 truncate font-medium">{f.hora} · {f.sala}</p>
-                    <p className={`text-[11px] sm:text-[12px] font-bold mt-0.5 ${f.available < 50 ? 'text-red-500' : 'text-emerald-600'}`}>{f.available} disponibles</p>
+                    <p className="text-[11px] sm:text-[12px] text-gray-500 mt-0.5 truncate font-medium">{f.hora} · {f.sala}</p>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <span className="text-[11px] sm:text-[12px] font-black text-[#E63946]">${f.revenue.toLocaleString()}</span>
+                      <span className={`text-[10px] sm:text-[11px] font-bold ${f.available < 50 ? 'text-red-500' : 'text-emerald-600'}`}>{f.available} disp.</span>
+                    </div>
                   </div>
                 </div>
               );

@@ -697,7 +697,50 @@ export default function EventsPage() {
         };
       });
 
-      setProjects(projectsData);
+      // Fallback: if dashboard_tabs returned nothing, create projects from dulos_events directly
+      if (projectsData.length === 0 && events.length > 0) {
+        const fallbackProjects: ProjectDisplay[] = events.map((event) => {
+          const eventZones = zones.filter((z) => z.event_id === event.id);
+          const eventOrders = orders.filter((o) => o.event_id === event.id);
+          const eventSchedules = schedules.filter((s) => s.event_id === event.id);
+          const ticketsSold = eventZones.reduce((sum, z) => sum + z.sold, 0);
+          const totalTickets = eventZones.reduce((sum, z) => sum + z.available + z.sold, 0);
+          const revenue = eventZones.reduce((sum, z) => sum + (z.sold * z.price), 0);
+
+          const ticketTypeMap = new Map<string, { price: number; sold: number; available: number }>();
+          eventZones.forEach((z) => {
+            const existing = ticketTypeMap.get(z.zone_name);
+            if (existing) { existing.sold += z.sold; existing.available += z.available; existing.price = Math.max(existing.price, z.price); }
+            else { ticketTypeMap.set(z.zone_name, { price: z.price, sold: z.sold, available: z.available }); }
+          });
+
+          return {
+            id: event.id,
+            name: event.name,
+            producer: 'Francisco Paolo Dupeyron Gutierrez',
+            image_url: event.image_url || '',
+            status: 'PUBLISHED' as const,
+            events: [{
+              id: event.id,
+              name: event.name,
+              venue: getVenueName(event.venue_id, venues) + (getVenueCity(event.venue_id, venues) ? `, ${getVenueCity(event.venue_id, venues)}` : ''),
+              date: event.start_date ? formatDate(event.start_date) : 'TBD',
+              image_url: event.image_url || '',
+              ticketsSold, totalTickets, revenue,
+              zones: eventZones.map((z, idx) => ({ id: `zone-${event.id}-${idx}`, nombre: z.zone_name, precio: z.price, capacidad: z.available + z.sold, vendidos: z.sold })),
+              schedules: eventSchedules.map((s) => ({ id: s.id, fecha: s.date, horaInicio: s.start_time, horaFin: s.end_time, activa: s.status === 'active', vendidos: s.sold_capacity })),
+              orders: eventOrders.slice(0, 10).map((o) => ({ id: o.order_number, cliente: o.customer_name, email: o.customer_email, zona: o.zone_name, cantidad: o.quantity, total: o.total_price, estado: mapPaymentStatus(o.payment_status), fecha: o.purchased_at })),
+              ticketTypes: Array.from(ticketTypeMap.entries()).map(([tName, data], idx) => ({ id: `tt-${idx}`, name: tName, price: data.price, sold: data.sold, available: data.available })).sort((a, b) => b.price - a.price),
+            }],
+            isPast: isPastDate(event.start_date),
+            revenue, commission: revenue * 0.15,
+            eventCount: 1,
+          };
+        });
+        setProjects(fallbackProjects);
+      } else {
+        setProjects(projectsData);
+      }
       setLoading(false);
     } catch (error) {
       console.error('Error loading events:', error);
