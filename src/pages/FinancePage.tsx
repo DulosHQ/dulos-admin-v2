@@ -562,67 +562,53 @@ export default function FinancePage() {
             </div>
           </div>
 
-          {/* Resumen por Zona + Donut */}
-          <div className="section-card">
-            <div className="section-card-header">
-              <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="section-card-title">Resumen de Ingresos por Zona</span>
-            </div>
-            <div className="section-card-body">
-              <div className="flex flex-col lg:flex-row gap-5 items-start">
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-5 w-full">
-                  {zoneRevenues.length > 0 ? zoneRevenues.slice(0, 3).map(z => (
-                    <div key={z.zone} className="metric-card">
-                      <p className="metric-card-title">{z.zone}</p>
-                      <p className="metric-card-value">{fmtCurrency(z.revenue)}</p>
-                      <p className="metric-card-subtitle text-gray-400">Ingresos acumulados</p>
-                    </div>
-                  )) : (
-                    <div className="col-span-3 text-center text-gray-500 py-4 text-sm">No hay datos de zonas disponibles</div>
-                  )}
-                </div>
-                {/* Donut chart */}
-                {donutData.length > 0 && (
-                  <div className="flex-shrink-0 flex flex-col items-center">
-                    <div className="relative">
-                      <PieChart width={150} height={150}>
-                        <Pie
-                          data={donutData}
-                          cx={75}
-                          cy={75}
-                          innerRadius={45}
-                          outerRadius={65}
-                          dataKey="value"
-                          stroke="none"
-                        >
-                          {donutData.map((entry, i) => (
-                            <Cell key={i} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(v) => fmtCurrency(Number(v))} />
-                      </PieChart>
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <span className="text-xs font-bold text-gray-700">{fmtCurrency(donutTotal)}</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap justify-center gap-3 mt-2">
-                      {donutData.map(d => (
-                        <span key={d.name} className="flex items-center gap-1 text-xs text-gray-600">
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
-                          {d.name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+          {/* Resumen por Zona + Donut — compact row */}
+          <div className="flex flex-row items-center gap-3 mt-1">
+            {zoneRevenues.length > 0 ? zoneRevenues.slice(0, 3).map(z => (
+              <div key={z.zone} className="flex-1 p-2 bg-white rounded-lg border border-gray-200">
+                <p className="text-[11px] font-bold text-gray-500 uppercase">{z.zone}</p>
+                <p className="text-base font-extrabold text-gray-900">{fmtCurrency(z.revenue)}</p>
               </div>
-            </div>
+            )) : (
+              <div className="flex-1 text-center text-gray-500 py-2 text-sm">No hay datos de zonas</div>
+            )}
+            {donutData.length > 0 && (
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <div className="relative">
+                  <PieChart width={120} height={120}>
+                    <Pie
+                      data={donutData}
+                      cx={60}
+                      cy={60}
+                      innerRadius={35}
+                      outerRadius={52}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {donutData.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => fmtCurrency(Number(v))} />
+                  </PieChart>
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span className="text-[10px] font-bold text-gray-700">{fmtCurrency(donutTotal)}</span>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  {donutData.map(d => (
+                    <span key={d.name} className="flex items-center gap-1 text-[11px] text-gray-600">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
+                      {d.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Daily Revenue Area Chart */}
-          {dailyRevenueData.length > 0 && (
+          {dailyRevenueData.length >= 3 && (
             <div className="section-card">
               <div className="section-card-header">
                 <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

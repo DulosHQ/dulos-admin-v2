@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import HeroMetrics from '../components/HeroMetrics';
 import {
   fetchEvents,
@@ -516,6 +516,21 @@ export default function SummaryPage() {
           <div className="section-card">
             <div className="section-card-header !py-2 !px-3">
               <span className="font-bold text-gray-900 text-sm">Actividad Reciente</span>
+              {salesTrendData.length > 0 && (
+                <div className="ml-auto" style={{ width: 80, height: 24 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={salesTrendData} margin={{ top: 2, right: 0, left: 0, bottom: 2 }}>
+                      <defs>
+                        <linearGradient id="miniSalesGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#EF4444" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="#EF4444" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <Area type="monotone" dataKey="amount" stroke="#EF4444" strokeWidth={1.5} fill="url(#miniSalesGrad)" dot={false} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
             <div className="divide-y divide-gray-50">
               {actividadReciente.map((a) => (
@@ -597,43 +612,7 @@ export default function SummaryPage() {
         )}
       </div>
 
-      {/* Tendencia de Ventas — sparkline */}
-      {salesTrendData.length > 0 && (
-        <div className="section-card">
-          <div className="px-3 pt-3 pb-1">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tendencia de Ventas</span>
-          </div>
-          <div className="px-3 pb-3" style={{ height: 120 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={salesTrendData} margin={{ top: 5, right: 5, left: 5, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#EF4444" stopOpacity={0.2} />
-                    <stop offset="100%" stopColor="#EF4444" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis
-                  dataKey="day"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: '#9CA3AF' }}
-                />
-                <Tooltip
-                  contentStyle={{ fontSize: 12, border: '1px solid #e5e7eb', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
-                  formatter={(value) => [`$${Number(value).toLocaleString()}`, 'Ventas']}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="amount"
-                  stroke="#EF4444"
-                  strokeWidth={2}
-                  fill="url(#salesGradient)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }
