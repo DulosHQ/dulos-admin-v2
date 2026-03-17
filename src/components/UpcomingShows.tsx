@@ -57,7 +57,9 @@ function getUrgencyBadge(occupancy: number, remaining: number) {
 }
 
 function formatDate(dateString: string): string {
+  if (!dateString) return 'TBD';
   const date = new Date(dateString);
+  if (isNaN(date.getTime())) return dateString;
   const options: Intl.DateTimeFormatOptions = {
     weekday: 'short',
     day: 'numeric',

@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { inviteUser } from '../app/actions/users.actions';
 import { updateSetting as updateSettingAction } from '../app/actions/settings.actions';
 import {
   fetchTeam,
   fetchAuditLogsByAction,
+  fetchDashboardStats,
   TeamMember,
   AuditLog,
+  DashboardStats,
 } from '../lib/supabase';
 
 const ACCENT = '#E63946';
@@ -107,6 +109,30 @@ const formatRelativeTime = (ts: number) => {
   return `${mins}m`;
 };
 
+// Generic CSV export function
+function exportToCSV(data: any[], filename: string, headers: string[]) {
+  const csvContent = [
+    headers.join(','),
+    ...data.map(row =>
+      headers.map(header => {
+        const value = row[header] || '';
+        // Escape CSV special characters
+        return `"${String(value).replace(/"/g, '""')}"`;
+      }).join(',')
+    )
+  ].join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [usuarios, setUsuarios] = useState<TeamDisplay[]>([]);
@@ -118,9 +144,12 @@ export default function AdminPage() {
   const [showRoleDetail, setShowRoleDetail] = useState<string | null>(null);
   const [editingSettingKey, setEditingSettingKey] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState('');
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
 
   // Auditoría collapsed state
   const [auditExpanded, setAuditExpanded] = useState(false);
+  const [expandedLogIndex, setExpandedLogIndex] = useState<number | null>(null);
 
   // Role management state
   const [rolePerms, setRolePerms] = useState<Record<string, Record<string, string[]>>>(() => {
@@ -135,9 +164,10 @@ export default function AdminPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [teamData, auditData] = await Promise.all([
+        const [teamData, auditData, statsData] = await Promise.all([
           fetchTeam().catch(() => []),
           fetchAuditLogsByAction(logFilter).catch(() => []),
+          fetchDashboardStats().catch(() => null),
         ]);
 
         setUsuarios(teamData.map((t) => ({
@@ -154,6 +184,11 @@ export default function AdminPage() {
           usuario: l.user_email,
           accion: `${l.action} ${l.entity_type}${l.entity_id ? ` (${l.entity_id})` : ''}`,
         })));
+
+        if (statsData) {
+          setDashboardStats(statsData);
+        }
+        setLastSyncTime(new Date());
 
         // Load settings from localStorage
         const savedSettings = localStorage.getItem('dulos_admin_settings');
@@ -215,6 +250,74 @@ export default function AdminPage() {
     <div className="bg-[#f8f6f6] p-3 sm:p-4 max-w-7xl mx-auto">
       <h1 className="text-lg sm:text-xl font-extrabold mb-4">Administración</h1>
 
+      {/* System Info Card */}
+      <div className="bg-white rounded-xl p-3 sm:p-4 mb-4 border border-gray-100">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span className="text-xs font-bold text-gray-600">Supabase Conectado</span>
+            </div>
+            <span className="text-xs text-gray-400">Dashboard V2 Beta</span>
+          </div>
+          <div className="flex items-center gap-4 text-xs text-gray-500">
+            {dashboardStats && (
+              <>
+                <span><span className="font-bold text-gray-700">{dashboardStats.totalEvents}</span> eventos</span>
+                <span><span className="font-bold text-gray-700">{dashboardStats.totalTickets}</span> boletos</span>
+                <span><span className="font-bold text-gray-700">{usuarios.length}</span> usuarios</span>
+                <span>Sync: {lastSyncTime.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Role Permission Matrix */}
+      <div className="bg-white rounded-xl p-3 sm:p-4 mb-4">
+        <h2 className="font-extrabold text-sm sm:text-base mb-3">Matriz de Permisos por Rol</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2 font-bold text-gray-600">Categoría / Rol</th>
+                {Object.entries(roleDefinitions).map(([key, role]) => (
+                  <th key={key} className="text-center py-2 px-2">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className={`w-3 h-3 rounded-full ${role.color}`}></span>
+                      <span className="font-bold text-[10px] leading-tight">{role.name}</span>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(allPermissions).map(([category, perms]) => (
+                <tr key={category} className="border-b hover:bg-gray-50">
+                  <td className="py-2 font-bold text-gray-700">{category}</td>
+                  {Object.entries(roleDefinitions).map(([roleKey, role]) => {
+                    const rolePerms = role.permissions[category] || [];
+                    const hasPerms = rolePerms.length > 0;
+                    return (
+                      <td key={roleKey} className="text-center py-2 px-2">
+                        <div className="flex flex-col items-center gap-1">
+                          {hasPerms ? (
+                            <span className="text-green-500 font-bold text-sm">✅</span>
+                          ) : (
+                            <span className="text-gray-300 text-sm">❌</span>
+                          )}
+                          <span className="text-[10px] text-gray-400">{rolePerms.length}</span>
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* Roles + Equipo row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4">
         {/* Roles Section */}
@@ -242,8 +345,29 @@ export default function AdminPage() {
         {/* Team Section */}
         <div className="bg-white rounded-xl p-3 sm:p-4">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="font-extrabold text-sm sm:text-base">Equipo</h2>
-            <button onClick={() => setShowInvite(true)} className="px-3 py-1.5 rounded-lg text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity" style={{ backgroundColor: ACCENT }}>+ Invitar</button>
+            <div>
+              <h2 className="font-extrabold text-sm sm:text-base">Equipo</h2>
+              <p className="text-xs text-gray-400">{usuarios.length}/10 miembros activos</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const teamData = usuarios.map(u => ({
+                    nombre: u.nombre,
+                    email: u.email,
+                    rol: u.rol,
+                    activo: u.activo ? 'Sí' : 'No',
+                    ultimoAcceso: new Date(u.ultimoAcceso).toLocaleDateString('es-MX')
+                  }));
+                  exportToCSV(teamData, 'equipo', ['nombre', 'email', 'rol', 'activo', 'ultimoAcceso']);
+                  toast.success('Equipo exportado a CSV');
+                }}
+                className="px-2 py-1 text-xs border border-gray-200 rounded text-gray-600 hover:bg-gray-50"
+              >
+                CSV
+              </button>
+              <button onClick={() => setShowInvite(true)} className="px-3 py-1.5 rounded-lg text-white text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity" style={{ backgroundColor: ACCENT }}>+ Invitar</button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs sm:text-sm">
@@ -267,7 +391,12 @@ export default function AdminPage() {
                           {roleDefinitions[u.rol]?.name || u.rol}
                         </span>
                       </td>
-                      <td className="py-1.5 text-gray-400 text-xs hidden sm:table-cell">{formatRelativeTime(u.ultimoAcceso)}</td>
+                      <td className="py-1.5 text-gray-400 text-xs hidden sm:table-cell">
+                        <div className="flex flex-col">
+                          <span>{formatRelativeTime(u.ultimoAcceso)}</span>
+                          <span className="text-[10px] text-gray-300">{new Date(u.ultimoAcceso).toLocaleDateString('es-MX')}</span>
+                        </div>
+                      </td>
                       <td className="py-1.5"><span className={`inline-block w-2 h-2 rounded-full ${u.activo ? 'bg-green-500' : 'bg-gray-400'}`} /></td>
                     </tr>
                   ))
@@ -314,12 +443,27 @@ export default function AdminPage() {
                   className="px-2 py-1 border border-gray-200 rounded text-xs flex-1 sm:flex-none"
                 >
                   <option value="">Todas las acciones</option>
-                  <option value="login">Inicios de sesión</option>
+                  <option value="stripe">Stripe</option>
+                  <option value="login">Acciones de usuario</option>
+                  <option value="system">Sistema</option>
                   <option value="create">Creaciones</option>
                   <option value="update">Actualizaciones</option>
                   <option value="delete">Eliminaciones</option>
-                  <option value="notification">Notificaciones</option>
                 </select>
+                <button
+                  onClick={() => {
+                    const auditData = logs.map(log => ({
+                      timestamp: log.timestamp,
+                      usuario: log.usuario,
+                      accion: log.accion
+                    }));
+                    exportToCSV(auditData, 'auditoria', ['timestamp', 'usuario', 'accion']);
+                    toast.success('Auditoría exportada a CSV');
+                  }}
+                  className="px-2 py-1 text-xs border border-gray-200 rounded text-gray-600 hover:bg-gray-50"
+                >
+                  CSV
+                </button>
                 <button
                   onClick={() => setAuditExpanded(false)}
                   className="px-2 py-1 border border-gray-200 rounded text-xs text-gray-500 hover:bg-gray-50"
@@ -340,11 +484,28 @@ export default function AdminPage() {
                     [1, 2, 3].map((i) => <SkeletonRow key={i} cols={3} />)
                   ) : logs.length > 0 ? (
                     logs.map((log, i) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="py-1.5 text-gray-400 font-mono text-[10px] sm:text-xs whitespace-nowrap">{log.timestamp}</td>
-                        <td className="py-1.5 text-[10px] sm:text-xs truncate max-w-[80px] sm:max-w-[120px] font-bold">{log.usuario}</td>
-                        <td className="py-1.5 text-[10px] sm:text-xs text-gray-600">{log.accion}</td>
-                      </tr>
+                      <React.Fragment key={i}>
+                        <tr className="border-b last:border-0 hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedLogIndex(expandedLogIndex === i ? null : i)}>
+                          <td className="py-1.5 text-gray-400 font-mono text-[10px] sm:text-xs whitespace-nowrap">{log.timestamp}</td>
+                          <td className="py-1.5 text-[10px] sm:text-xs truncate max-w-[80px] sm:max-w-[120px] font-bold">{log.usuario}</td>
+                          <td className="py-1.5 text-[10px] sm:text-xs text-gray-600 flex items-center gap-2">
+                            <span>{log.accion}</span>
+                            <svg className={`w-3 h-3 text-gray-400 transition-transform ${expandedLogIndex === i ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          </td>
+                        </tr>
+                        {expandedLogIndex === i && (
+                          <tr className="bg-gray-50">
+                            <td colSpan={3} className="py-2 px-4 text-xs text-gray-600">
+                              <div className="space-y-1">
+                                <div><span className="font-bold">Fecha completa:</span> {log.timestamp}</div>
+                                <div><span className="font-bold">Usuario:</span> {log.usuario}</div>
+                                <div><span className="font-bold">Acción:</span> {log.accion}</div>
+                                <div><span className="font-bold">Tipo:</span> {logFilter || 'Todas las acciones'}</div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))
                   ) : (
                     <tr><td colSpan={3} className="py-4 text-center text-gray-400 text-sm">No hay registros</td></tr>

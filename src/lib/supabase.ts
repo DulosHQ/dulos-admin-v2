@@ -9,14 +9,58 @@ const headers = {
 
 // Types
 export interface DulosEvent {
-  id: string;
-  name: string;
-  venue: string;
-  city: string;
-  dates: string;
-  status: string;
+  id: string;           // e.g. "mijares"
+  name: string;         // e.g. "Mijares Sinfónico"
+  start_date: string;   // ISO datetime
+  end_date: string;     // ISO datetime
   image_url: string;
-  buy_url: string;
+  status: string;       // "active"
+  slug: string;
+  description: string;
+  price_from: number;   // e.g. 1249
+  original_price: number;
+  featured: boolean;
+  sort_order: number;
+  venue_id: string;     // FK to dulos_venues
+  category: string;     // "concierto", "teatro"
+  event_type: string;   // "single"
+  created_at: string;
+  updated_at: string;
+  // Optional SEO fields
+  seo_title?: string;
+  seo_description?: string;
+  long_description?: string;
+  quote?: string;
+  show_remaining?: boolean;
+  seatmap_event_key?: string;
+}
+
+export interface Venue {
+  id: string;
+  name: string;        // "Teatro Morelos"
+  slug: string;
+  address: string;
+  city: string;         // "Toluca"
+  state: string;        // "Puebla"
+  country: string;
+  latitude: number;
+  longitude: number;
+  maps_url: string;
+  timezone: string;     // "America/Mexico_City"
+  capacity: number;     // 500
+  image_url?: string;
+  created_at: string;
+}
+
+export interface SalesSummary {
+  event_id: string;
+  event_name: string;
+  venue_name: string;
+  total_orders: number;
+  total_tickets_sold: number;
+  total_revenue: number;
+  checked_in: number;
+  refunded: number;
 }
 
 export interface TicketZone {
@@ -162,6 +206,34 @@ async function supabaseFetch<T>(endpoint: string): Promise<T> {
   return response.json();
 }
 
+// Venue cache and helpers
+let venueCache: Map<string, Venue> | null = null;
+
+export async function fetchVenues(): Promise<Venue[]> {
+  try {
+    return await supabaseFetch<Venue[]>('dulos_venues');
+  } catch (error) {
+    console.error('Error fetching venues:', error);
+    throw error;
+  }
+}
+
+export async function getVenueMap(): Promise<Map<string, Venue>> {
+  if (!venueCache) {
+    const venues = await fetchVenues();
+    venueCache = new Map(venues.map(v => [v.id, v]));
+  }
+  return venueCache;
+}
+
+export function getVenueName(venueId: string, venueMap: Map<string, Venue>): string {
+  return venueMap.get(venueId)?.name || venueId;
+}
+
+export function getVenueCity(venueId: string, venueMap: Map<string, Venue>): string {
+  return venueMap.get(venueId)?.city || '';
+}
+
 export async function fetchEvents(): Promise<DulosEvent[]> {
   try {
     return await supabaseFetch<DulosEvent[]>('dulos_events?status=eq.active');
@@ -269,7 +341,7 @@ export async function fetchTeam(): Promise<TeamMember[]> {
 
 export async function fetchAllEvents(): Promise<DulosEvent[]> {
   try {
-    return await supabaseFetch<DulosEvent[]>('dulos_events?order=dates.desc');
+    return await supabaseFetch<DulosEvent[]>('dulos_events?order=start_date.desc');
   } catch (error) {
     console.error('Error fetching all events:', error);
     throw error;
@@ -285,6 +357,73 @@ export async function fetchAllCoupons(): Promise<Coupon[]> {
   }
 }
 
+export async function fetchSalesSummary(): Promise<SalesSummary[]> {
+  try {
+    return await supabaseFetch<SalesSummary[]>('v_sales_summary');
+  } catch (error) {
+    console.error('Error fetching sales summary:', error);
+    throw error;
+  }
+}
+
+// Dashboard tabs fetch functions
+export async function fetchDashboardTab(tabName: string): Promise<{ headers: string[]; rows: any[]; totalRows: number }> {
+  try {
+    const data = await supabaseFetch<any[]>(`dulos_dashboard_tabs?tab_name=eq.${tabName}&order=id.asc`);
+
+    if (data.length === 0) {
+      return { headers: [], rows: [], totalRows: 0 };
+    }
+
+    // Aggregate all rows across multiple records (for pagination)
+    let allHeaders: string[] = [];
+    let allRows: any[] = [];
+    let totalRows = 0;
+
+    data.forEach(record => {
+      if (record.headers && allHeaders.length === 0) {
+        allHeaders = record.headers;
+      }
+      if (record.row_data && Array.isArray(record.row_data)) {
+        allRows = allRows.concat(record.row_data);
+      }
+      if (record.total_rows) {
+        totalRows = Math.max(totalRows, record.total_rows);
+      }
+    });
+
+    return {
+      headers: allHeaders,
+      rows: allRows,
+      totalRows: totalRows || allRows.length
+    };
+  } catch (error) {
+    console.error(`Error fetching dashboard tab ${tabName}:`, error);
+    throw error;
+  }
+}
+
+// Convenience functions for specific tabs
+export async function fetchProyectos() {
+  return fetchDashboardTab('Proyectos');
+}
+
+export async function fetchPedidos() {
+  return fetchDashboardTab('Pedidos');
+}
+
+export async function fetchBoletos() {
+  return fetchDashboardTab('Boletos');
+}
+
+export async function fetchReservas() {
+  return fetchDashboardTab('Reservas');
+}
+
+export async function fetchComisiones() {
+  return fetchDashboardTab('Comisiones');
+}
+
 export async function fetchAllOrders(): Promise<Order[]> {
   try {
     return await supabaseFetch<Order[]>('dulos_orders?order=purchased_at.desc');
@@ -296,20 +435,18 @@ export async function fetchAllOrders(): Promise<Order[]> {
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
   try {
-    const [events, tickets, orders, zones] = await Promise.all([
+    const [events, salesSummary, zones] = await Promise.all([
       fetchEvents(),
-      supabaseFetch<{ id: string }[]>('dulos_tickets?select=id'),
-      supabaseFetch<{ total_price: number }[]>('dulos_orders?select=total_price'),
+      fetchSalesSummary(),
       fetchZones(),
     ]);
 
-    // Count total tickets from dulos_tickets
-    const totalTickets = tickets.length;
-
-    // Calculate revenue from dulos_orders SUM(total_price)
-    const totalRevenue = orders.reduce((sum, order) => sum + (order.total_price || 0), 0);
+    // Calculate revenue and tickets from sales summary (REAL data)
+    const totalRevenue = salesSummary.reduce((sum, s) => sum + s.total_revenue, 0);
+    const totalTickets = salesSummary.reduce((sum, s) => sum + s.total_tickets_sold, 0);
     const totalEvents = events.length;
 
+    // Calculate occupancy rate from zones
     const totalSold = zones.reduce((sum, zone) => sum + zone.sold, 0);
     const totalAvailable = zones.reduce((sum, zone) => sum + zone.available + zone.sold, 0);
     const occupancyRate = totalAvailable > 0 ? (totalSold / totalAvailable) * 100 : 0;
