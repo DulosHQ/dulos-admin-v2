@@ -68,16 +68,15 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("resumen");
   const [loading, setLoading] = useState(true);
   const [splashDone, setSplashDone] = useState(false);
+  const [showFullSplash, setShowFullSplash] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
-    // Set minimum splash display time of 2.5 seconds
-    const splashTimer = setTimeout(() => {
-      if (mounted) setSplashDone(true);
-    }, 2500);
-
     const init = async () => {
+      // Check if splash has been shown in this session
+      const splashShown = sessionStorage.getItem('dulos_splash_shown');
+
       // Middleware already verified auth — just get the session
       const { data: { session } } = await getSupabase().auth.getSession();
 
@@ -95,13 +94,32 @@ export default function Home() {
         permissions: ROLE_PERMISSIONS["ADMIN"] || [],
       };
 
-      if (mounted) { setUser(userObj); setLoading(false); }
+      if (mounted) {
+        setUser(userObj);
+
+        // Show full splash only on first login
+        if (!splashShown) {
+          setShowFullSplash(true);
+          // Set splash done after 2.5 seconds for first-time users
+          setTimeout(() => {
+            if (mounted) {
+              setSplashDone(true);
+              sessionStorage.setItem('dulos_splash_shown', 'true');
+            }
+          }, 2500);
+        } else {
+          // Quick load for returning users
+          setShowFullSplash(false);
+          setSplashDone(true);
+        }
+
+        setLoading(false);
+      }
     };
 
     init();
     return () => {
       mounted = false;
-      clearTimeout(splashTimer);
     };
   }, [router]);
 
@@ -109,71 +127,111 @@ export default function Home() {
     await getSupabase().auth.signOut();
     localStorage.removeItem("dulos_user");
     localStorage.removeItem("dulos_sec_v");
+    sessionStorage.removeItem("dulos_splash_shown");
     router.push("/login");
   };
 
   if (loading || !user || !splashDone) {
-    return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center relative overflow-hidden">
-        {/* Background image with Ken Burns effect */}
-        <div className="absolute inset-0" style={{ animation: 'kenBurns 12s ease-in-out infinite alternate' }}>
-          <Image
-            src="/splash-bg.jpg"
-            alt="Concert background"
-            fill
-            className="object-cover"
-            priority
-          />
+    if (showFullSplash) {
+      // Full splash screen for first-time users
+      return (
+        <div className="min-h-screen bg-[#050505] flex items-center justify-center relative overflow-hidden">
+          {/* Background image with Ken Burns effect */}
+          <div className="absolute inset-0" style={{ animation: 'kenBurns 12s ease-in-out infinite alternate' }}>
+            <Image
+              src="/splash-bg.jpg"
+              alt="Concert background"
+              fill
+              className="object-cover"
+              priority
+            />
+          </div>
+          {/* Dark overlay */}
+          <div className="absolute inset-0 bg-black/60" />
+
+          {/* Content */}
+          <div className="relative z-10 flex flex-col items-center gap-6">
+            {/* Dulos logo with actual image */}
+            <div className="relative w-20 h-20 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center" style={{ animation: 'logoPulse 2s ease-in-out infinite' }}>
+              <Image
+                src="/dulos-logo.jpg"
+                alt="Dulos Logo"
+                width={80}
+                height={80}
+                className="rounded-full object-cover"
+                style={{
+                  animation: 'logoRotate 3s linear infinite',
+                  filter: 'drop-shadow(0 0 20px rgba(239, 68, 68, 0.6))'
+                }}
+                priority
+              />
+            </div>
+
+            {/* Brand text */}
+            <div className="text-center">
+              <h1 className="text-white text-2xl font-black tracking-wider" style={{ animation: 'fadeInUp 0.8s ease-out' }}>DULOS</h1>
+              <p className="text-white/60 text-sm mt-1 font-medium" style={{ animation: 'fadeInUp 1s ease-out' }}>Plataforma de Entretenimiento</p>
+            </div>
+
+            {/* Loading bar */}
+            <div className="w-48 h-1 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-[#EF4444] via-[#F59E0B] to-[#EF4444] rounded-full" style={{ animation: 'loadingBar 1.5s ease-in-out infinite', backgroundSize: '200% 100%' }} />
+            </div>
+
+            <p className="text-white/40 text-xs font-medium tracking-wide" style={{ animation: 'fadeInUp 1.2s ease-out' }}>
+              {!user ? 'Redirigiendo...' : 'Cargando experiencia...'}
+            </p>
+          </div>
+
+          <style>{`
+            @keyframes kenBurns {
+              0% { transform: scale(1) translateY(0); }
+              100% { transform: scale(1.1) translateY(-2%); }
+            }
+            @keyframes logoPulse {
+              0%, 100% { transform: scale(1); opacity: 1; }
+              50% { transform: scale(1.08); opacity: 0.85; }
+            }
+            @keyframes logoRotate {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+            @keyframes fadeInUp {
+              from { opacity: 0; transform: translateY(12px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes loadingBar {
+              0% { width: 0%; background-position: 0% 0; }
+              50% { width: 70%; background-position: 100% 0; }
+              100% { width: 100%; background-position: 0% 0; }
+            }
+          `}</style>
         </div>
-        {/* Dark overlay */}
-        <div className="absolute inset-0 bg-black/60" />
+      );
+    } else {
+      // Quick skeleton loader for returning users
+      return (
+        <div className="min-h-screen bg-gray-50 p-4">
+          <div className="max-w-7xl mx-auto space-y-4 animate-pulse">
+            {/* Header skeleton */}
+            <div className="h-16 bg-gray-200 rounded-lg"></div>
 
-        {/* Content */}
-        <div className="relative z-10 flex flex-col items-center gap-6">
-          {/* Dulos logo pulse */}
-          <div className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center" style={{ animation: 'logoPulse 2s ease-in-out infinite' }}>
-            <svg width="48" height="48" viewBox="0 0 100 100" fill="none">
-              <path d="M50 10 C25 10, 10 30, 10 50 C10 70, 25 90, 50 90 C75 90, 90 70, 90 50 C90 30, 75 10, 50 10 Z M50 25 C65 25, 75 37, 75 50 C75 63, 65 75, 50 75 C35 75, 25 63, 25 50 C25 37, 35 25, 50 25 Z" fill="#EF4444" />
-            </svg>
+            {/* Metrics skeleton */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              {[1,2,3,4,5].map((i) => (
+                <div key={i} className="h-20 bg-gray-200 rounded-lg"></div>
+              ))}
+            </div>
+
+            {/* Content skeleton */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="h-40 bg-gray-200 rounded-lg"></div>
+              <div className="h-40 bg-gray-200 rounded-lg"></div>
+            </div>
           </div>
-
-          {/* Brand text */}
-          <div className="text-center">
-            <h1 className="text-white text-2xl font-black tracking-wider" style={{ animation: 'fadeInUp 0.8s ease-out' }}>DULOS</h1>
-            <p className="text-white/60 text-sm mt-1 font-medium" style={{ animation: 'fadeInUp 1s ease-out' }}>Plataforma de Entretenimiento</p>
-          </div>
-
-          {/* Loading bar */}
-          <div className="w-48 h-1 bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-[#EF4444] via-[#F59E0B] to-[#EF4444] rounded-full" style={{ animation: 'loadingBar 1.5s ease-in-out infinite', backgroundSize: '200% 100%' }} />
-          </div>
-
-          <p className="text-white/40 text-xs font-medium tracking-wide" style={{ animation: 'fadeInUp 1.2s ease-out' }}>
-            {!user ? 'Redirigiendo...' : 'Cargando experiencia...'}
-          </p>
         </div>
-
-        <style>{`
-          @keyframes kenBurns {
-            0% { transform: scale(1) translateY(0); }
-            100% { transform: scale(1.1) translateY(-2%); }
-          }
-          @keyframes logoPulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.08); opacity: 0.85; }
-          }
-          @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(12px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          @keyframes loadingBar {
-            0% { width: 0%; background-position: 0% 0; }
-            50% { width: 70%; background-position: 100% 0; }
-            100% { width: 100%; background-position: 0% 0; }
-          }
-        `}</style>
-      </div>
-    );
+      );
+    }
   }
 
   const pages: Record<string, React.ReactNode> = {

@@ -235,6 +235,8 @@ export default function SummaryPage() {
 
         setAlertas(newAlertas.slice(0, 8));
 
+        // Enhanced revenue matching to handle different event_id formats
+
         // Funciones from events + zones
         setFuncionesProximas(events.slice(0, 6).map((event, idx) => {
           const ez = zones.filter((z) => z.event_id === event.id);
@@ -260,7 +262,19 @@ export default function SummaryPage() {
               day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
             });
           }
-          const sale = salesSummary.find(s => s.event_id === event.id);
+
+          // Try multiple matching strategies for revenue
+          let sale = salesData.find(s => s.event_id === event.id);
+          if (!sale) {
+            // Try case-insensitive match
+            sale = salesData.find(s => s.event_id?.toLowerCase() === event.id?.toLowerCase());
+          }
+          if (!sale) {
+            // Try matching by name
+            sale = salesData.find(s => s.event_id === event.name || s.event_id?.toLowerCase() === event.name?.toLowerCase());
+          }
+
+
           return {
             id: idx + 1,
             eventId: event.id,
@@ -272,7 +286,7 @@ export default function SummaryPage() {
             image_url: event.image_url || '',
             revenue: sale?.total_revenue || 0,
             orders: sale?.total_orders || 0,
-            ticketsSold: sale?.total_tickets_sold || 0,
+            ticketsSold: sale?.total_tickets_sold || sold, // Fallback to zone sold count
           };
         }));
 
@@ -626,13 +640,13 @@ export default function SummaryPage() {
                     setShowAllActivity(false);
                   } else if (allActividad.length > 6) {
                     setShowAllActivity(true);
-                  } else {
-                    toast.info('Próximamente');
                   }
+                  // Removed toast notification
                 }}
-                className="text-xs text-[#E63946] font-bold hover:underline"
+                className={`text-xs font-bold ${allActividad.length > 6 || showAllActivity ? 'text-[#E63946] hover:underline cursor-pointer' : 'text-gray-400 cursor-not-allowed'}`}
+                disabled={allActividad.length <= 6 && !showAllActivity}
               >
-                {showAllActivity ? 'Mostrar menos' : 'Ver todo'}
+                {showAllActivity ? 'Mostrar menos' : allActividad.length > 6 ? 'Ver todo' : 'Ver todo'}
               </button>
             </div>
           </div>
