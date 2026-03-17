@@ -17,6 +17,7 @@ interface HeroMetricsProps {
   tickets: MetricData;
   occupancy: MetricData;
   upcoming: MetricData;
+  commission: MetricData;
 }
 
 /* Premium filled icons — Dulos brand red with gradient depth */
@@ -82,6 +83,19 @@ const METRIC_ICONS: Record<string, React.ReactNode> = {
       <rect x="15.3" y="16.5" width="2.2" height="2.2" rx=".5" fill="#E63946" opacity=".2"/>
     </svg>
   ),
+  'Comisión Dulos': (
+    <svg className="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none">
+      <defs>
+        <linearGradient id="comm" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#E63946"/><stop offset="1" stopColor="#C1121F"/>
+        </linearGradient>
+      </defs>
+      <path d="M12 2.5L3.5 6v4.5c0 5.5 3.5 10.5 8.5 11 5-0.5 8.5-5.5 8.5-11V6L12 2.5z" fill="url(#comm)" opacity=".12"/>
+      <path d="M12 2.5L3.5 6v4.5c0 5.5 3.5 10.5 8.5 11 5-0.5 8.5-5.5 8.5-11V6L12 2.5z" stroke="url(#comm)" strokeWidth="1.4"/>
+      <path d="M8.5 11.5L11 14l4.5-4.5" stroke="#E63946" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx="12" cy="8" r="1.5" fill="#E63946" opacity=".8"/>
+    </svg>
+  ),
 };
 
 const DEFAULT_ICON = (
@@ -103,13 +117,14 @@ function MetricCard({ metric }: { metric: MetricData }) {
   );
 }
 
-export default function HeroMetrics({ revenue, tickets, occupancy, upcoming }: HeroMetricsProps) {
+export default function HeroMetrics({ revenue, tickets, occupancy, upcoming, commission }: HeroMetricsProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
       <MetricCard metric={revenue} />
       <MetricCard metric={tickets} />
       <MetricCard metric={occupancy} />
       <MetricCard metric={upcoming} />
+      <MetricCard metric={commission} />
     </div>
   );
 }

@@ -11,8 +11,10 @@ import {
   fetchCheckins,
   fetchEscalations,
   fetchTickets,
+  fetchSalesSummary,
   getVenueMap,
   getVenueName,
+  getVenueCity,
   DulosEvent,
   TicketZone,
   Order,
@@ -20,6 +22,7 @@ import {
   Escalation,
   Ticket,
   Venue,
+  SalesSummary,
 } from '../lib/supabase';
 
 interface Alerta {
@@ -64,6 +67,7 @@ const emptyMetrics = {
   tickets: { label: 'Boletos Vendidos', value: '0', trend: { value: 0, isPositive: true }, sparkline: [0,0,0,0,0] },
   occupancy: { label: 'Ocupación Promedio', value: '0%', trend: { value: 0, isPositive: true }, sparkline: [0,0,0,0,0] },
   upcoming: { label: 'Funciones Próximas', value: '0', trend: { value: 0, isPositive: true }, sparkline: [0,0,0,0,0] },
+  commission: { label: 'Comisión Dulos', value: '$0 MXN', trend: { value: 0, isPositive: true }, sparkline: [0,0,0,0,0] },
 };
 
 function getActividadIcon(tipo: string): string {
@@ -90,8 +94,8 @@ function formatTimeAgo(dateString: string): string {
 
 function SkeletonMetrics() {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-pulse">
-      {[1,2,3,4].map((i) => (
+    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 animate-pulse">
+      {[1,2,3,4,5].map((i) => (
         <div key={i} className="metric-card p-3">
           <div className="h-3 bg-gray-200 rounded w-2/3 mb-2"></div>
           <div className="h-6 bg-gray-200 rounded w-1/2"></div>
@@ -123,6 +127,7 @@ export default function SummaryPage() {
   const [venueMap, setVenueMap] = useState<Map<string, Venue>>(new Map());
   const [showAllActivity, setShowAllActivity] = useState(false);
   const [allActividad, setAllActividad] = useState<Actividad[]>([]);
+  const [salesSummary, setSalesSummary] = useState<SalesSummary[]>([]);
   const detailRef = useRef<HTMLDivElement>(null);
 
   const BOLETOS_PER_PAGE = 5;
@@ -130,7 +135,7 @@ export default function SummaryPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [events, zones, orders, checkins, escalations, tickets, venues] = await Promise.all([
+        const [events, zones, orders, checkins, escalations, tickets, venues, salesData] = await Promise.all([
           fetchEvents().catch(() => [] as DulosEvent[]),
           fetchZones().catch(() => [] as TicketZone[]),
           fetchOrders().catch(() => [] as Order[]),
@@ -138,22 +143,33 @@ export default function SummaryPage() {
           fetchEscalations().catch(() => [] as Escalation[]),
           fetchTickets().catch(() => [] as Ticket[]),
           getVenueMap().catch(() => new Map<string, Venue>()),
+          fetchSalesSummary().catch(() => [] as SalesSummary[]),
         ]);
 
         setAllZones(zones);
         setAllEvents(events);
         setVenueMap(venues);
+        setSalesSummary(salesData);
 
-        const totalRevenue = zones.reduce((sum, z) => sum + (z.sold * z.price), 0);
-        const totalTickets = zones.reduce((sum, z) => sum + z.sold, 0);
+        // Use REAL revenue from v_sales_summary
+        const totalRevenue = salesData.reduce((sum, s) => sum + s.total_revenue, 0);
+        const totalTicketsSold = salesData.reduce((sum, s) => sum + s.total_tickets_sold, 0);
+        const totalOrders = salesData.reduce((sum, s) => sum + s.total_orders, 0);
+
+        // Calculate occupancy from zones (for overall venue capacity perspective)
+        const totalZoneTickets = zones.reduce((sum, z) => sum + z.sold, 0);
         const totalAvailable = zones.reduce((sum, z) => sum + z.available + z.sold, 0);
-        const occupancy = totalAvailable > 0 ? Math.round((totalTickets / totalAvailable) * 100) : 0;
+        const occupancy = totalAvailable > 0 ? Math.round((totalZoneTickets / totalAvailable) * 100) : 0;
+
+        // Calculate commission (15% of total revenue)
+        const commission = totalRevenue * 0.15;
 
         setMetrics({
           revenue: { label: 'Ingresos del Mes', value: `$${totalRevenue.toLocaleString()} MXN`, trend: { value: 0, isPositive: true }, sparkline: [0,0,0,0, totalRevenue > 0 ? 100 : 0] },
-          tickets: { label: 'Boletos Vendidos', value: totalTickets.toLocaleString(), trend: { value: 0, isPositive: true }, sparkline: [0,0,0,0, totalTickets > 0 ? 100 : 0] },
+          tickets: { label: 'Boletos Vendidos', value: totalTicketsSold.toLocaleString(), trend: { value: 0, isPositive: true }, sparkline: [0,0,0,0, totalTicketsSold > 0 ? 100 : 0] },
           occupancy: { label: 'Ocupación Promedio', value: `${occupancy}%`, trend: { value: 0, isPositive: occupancy >= 70 }, sparkline: [0,0,0,0, occupancy] },
           upcoming: { label: 'Funciones Próximas', value: String(events.length), trend: { value: 0, isPositive: true }, sparkline: [0,0,0,0, events.length] },
+          commission: { label: 'Comisión Dulos', value: `$${commission.toLocaleString()} MXN`, trend: { value: 0, isPositive: true }, sparkline: [0,0,0,0, commission > 0 ? 100 : 0] },
         });
 
         // Alerts — enriched with event details
@@ -217,13 +233,15 @@ export default function SummaryPage() {
           const sold = ez.reduce((s, z) => s + z.sold, 0);
           const total = ez.reduce((s, z) => s + z.available + z.sold, 0);
           const venueName = getVenueName(event.venue_id, venues);
-          const eventDate = event.start_date ? new Date(event.start_date).toLocaleDateString('es-MX') : 'TBD';
+          const venueCity = getVenueCity(event.venue_id, venues);
+          const venueDisplay = venueCity ? `${venueName} · ${venueCity}` : venueName;
+          const eventDate = event.start_date ? new Date(event.start_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBD';
           return {
             id: idx + 1,
             eventId: event.id,
             nombre: event.name,
             hora: eventDate,
-            sala: venueName,
+            sala: venueDisplay,
             ocupacion: total > 0 ? Math.round((sold / total) * 100) : 0,
             available: ez.reduce((s, z) => s + z.available, 0),
             image_url: event.image_url || '',
@@ -269,6 +287,16 @@ export default function SummaryPage() {
             });
           }
         });
+
+        // Add fallback if no activities
+        if (actividades.length === 0) {
+          actividades.push({
+            id: 'empty',
+            tipo: 'info',
+            mensaje: 'Sin actividad reciente',
+            tiempo: '',
+          });
+        }
 
         setAllActividad(actividades);
         setActividadReciente(actividades.slice(0, 6));
@@ -373,7 +401,41 @@ export default function SummaryPage() {
 
   return (
     <div className="space-y-4">
-      <HeroMetrics revenue={metrics.revenue} tickets={metrics.tickets} occupancy={metrics.occupancy} upcoming={metrics.upcoming} />
+      <HeroMetrics revenue={metrics.revenue} tickets={metrics.tickets} occupancy={metrics.occupancy} upcoming={metrics.upcoming} commission={metrics.commission} />
+
+      {/* Revenue per Event */}
+      {salesSummary.length > 0 && (
+        <div className="section-card">
+          <div className="section-card-header !py-2 !px-3">
+            <span className="font-bold text-gray-900 text-sm">Ingresos por Evento</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 p-3">
+            {salesSummary.slice(0, 6).map((sale, idx) => {
+              const event = allEvents.find((e) => e.id === sale.event_id);
+              return (
+                <div
+                  key={idx}
+                  className="flex gap-0 rounded-xl border overflow-hidden bg-white border-gray-100 hover:shadow-sm transition-all"
+                >
+                  {event?.image_url ? (
+                    <img src={event.image_url} alt="" className="w-16 sm:w-20 object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-16 sm:w-20 bg-gray-100 flex items-center justify-center flex-shrink-0">🎭</div>
+                  )}
+                  <div className="flex-1 min-w-0 flex flex-col justify-center py-2 sm:py-2.5 px-2 sm:px-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-extrabold text-gray-900 text-xs sm:text-[13px] truncate leading-tight">{sale.event_name}</p>
+                      <span className="text-xs sm:text-[13px] font-black flex-shrink-0 text-green-600">${sale.total_revenue.toLocaleString()}</span>
+                    </div>
+                    <p className="text-[11px] sm:text-[12px] text-gray-500 mt-1 font-medium">{sale.total_orders} órdenes · {sale.total_tickets_sold} boletos</p>
+                    <p className="text-[11px] sm:text-[12px] text-gray-500 font-medium">{sale.venue_name}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Funciones Próximas */}
       <div className="section-card">
