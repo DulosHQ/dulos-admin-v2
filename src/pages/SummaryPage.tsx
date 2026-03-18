@@ -66,6 +66,8 @@ interface ZoneDetail {
   sold: number;
   available: number;
   percentage: number;
+  price: number;
+  revenue: number;
 }
 
 const emptyMetrics: MetricData[] = [
@@ -83,6 +85,18 @@ function getActividadIcon(tipo: string): string {
     case 'nuevo_usuario': return '\uD83D\uDC64';
     default: return '\uD83D\uDCCC';
   }
+}
+
+function cleanDisplayName(name: string): string {
+  // Filter UUID-style names (e.g. dc669af6-fb18-4519-...)
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-/.test(name)) return 'Cliente';
+  return name;
+}
+
+function getOccupancyBadge(pct: number): { text: string; classes: string } {
+  if (pct >= 80) return { text: 'CRITICO', classes: 'bg-red-100 text-red-800' };
+  if (pct >= 50) return { text: 'ALTO', classes: 'bg-yellow-100 text-yellow-800' };
+  return { text: 'NORMAL', classes: 'bg-green-100 text-green-800' };
 }
 
 function formatTimeAgo(dateString: string): string {
@@ -320,6 +334,7 @@ export default function SummaryPage() {
           .slice(0, 15)
           .forEach((ticket) => {
             const eventName = eventMap.get(ticket.event_id)?.name || ticket.event_id;
+            const displayName = cleanDisplayName(ticket.customer_name);
             const key = `ticket-${ticket.customer_name}-${ticket.event_id}`;
             if (!seen.has(key)) {
               seen.add(key);
@@ -327,7 +342,7 @@ export default function SummaryPage() {
               actividades.push({
                 id: `tk-${ticket.id}`,
                 tipo: 'venta',
-                mensaje: `${ticket.customer_name} \u2192 ${eventName}`,
+                mensaje: `${displayName} \u2192 ${eventName}`,
                 tiempo: formatTimeAgo(ticket.created_at),
                 monto: price > 0 ? price : undefined,
               });
@@ -339,13 +354,14 @@ export default function SummaryPage() {
           .filter(c => c.customer_name && c.customer_name !== 'DUPLICADO' && c.scanned_at)
           .sort((a, b) => new Date(b.scanned_at).getTime() - new Date(a.scanned_at).getTime())
           .forEach((checkin) => {
+            const checkinDisplayName = cleanDisplayName(checkin.customer_name);
             const key = `checkin-${checkin.customer_name}-${checkin.event_name}`;
             if (!seen.has(key)) {
               seen.add(key);
               actividades.push({
                 id: `ci-${checkin.id}`,
                 tipo: 'checkin',
-                mensaje: `${checkin.customer_name} \u2192 ${checkin.event_name}`,
+                mensaje: `${checkinDisplayName} \u2192 ${checkin.event_name}`,
                 tiempo: formatTimeAgo(checkin.scanned_at),
               });
             }
@@ -450,6 +466,8 @@ export default function SummaryPage() {
         sold: z.sold,
         available: z.available,
         percentage: capacity > 0 ? Math.round((z.sold / capacity) * 100) : 0,
+        price: z.price,
+        revenue: z.sold * z.price,
       };
     });
     setEventZoneDetails(details);
@@ -534,7 +552,12 @@ export default function SummaryPage() {
                   <div className="flex-1 min-w-0 flex flex-col justify-center py-2 sm:py-2.5 px-2 sm:px-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-extrabold text-gray-900 text-xs sm:text-[13px] truncate leading-tight">{f.nombre}</p>
-                      <span className={`text-xs sm:text-[13px] font-black flex-shrink-0 ${f.ocupacion >= 80 ? 'text-red-500' : f.ocupacion >= 50 ? 'text-amber-500' : 'text-gray-300'}`}>{f.ocupacion}%</span>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className={`text-xs sm:text-[13px] font-black ${f.ocupacion >= 80 ? 'text-red-500' : f.ocupacion >= 50 ? 'text-amber-500' : 'text-gray-400'}`}>{f.ocupacion}%</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold ${getOccupancyBadge(f.ocupacion).classes}`}>
+                          {getOccupancyBadge(f.ocupacion).text}
+                        </span>
+                      </div>
                     </div>
                     <p className="text-[11px] sm:text-[12px] text-gray-500 mt-0.5 truncate font-medium">{f.hora} · {f.sala}</p>
                     <div className="flex items-center justify-between mt-0.5">
@@ -569,9 +592,12 @@ export default function SummaryPage() {
 
                 {/* Right: event info + occupancy bar */}
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-extrabold text-gray-900 text-base">{expandedEventData.nombre}</h3>
-                  <p className="text-sm text-gray-500 mt-0.5">{expandedEventData.sala}</p>
+                  <h3 className="font-black text-gray-900 text-lg sm:text-xl tracking-tight">{expandedEventData.nombre}</h3>
+                  <p className="text-sm text-gray-500 mt-0.5 font-medium">{expandedEventData.sala}</p>
                   <p className="text-sm text-gray-500">{expandedEventData.hora}</p>
+                  {expandedEventData.revenue > 0 && (
+                    <p className="text-lg font-black text-[#EF4444] mt-1">${expandedEventData.revenue.toLocaleString()} MXN</p>
+                  )}
 
                   {/* Occupancy bar */}
                   <div className="mt-3">
@@ -598,30 +624,45 @@ export default function SummaryPage() {
               {/* Zone details table */}
               {eventZoneDetails.length > 0 && (
                 <div className="mt-3 overflow-x-auto">
-                  <table className="w-full text-xs">
+                  <table className="data-table">
                     <thead>
-                      <tr className="text-left text-gray-500 border-b border-gray-100">
-                        <th className="pb-1.5 font-bold">Zona</th>
-                        <th className="pb-1.5 font-bold text-right">Capacidad</th>
-                        <th className="pb-1.5 font-bold text-right">Vendidos</th>
-                        <th className="pb-1.5 font-bold text-right">Disponibles</th>
-                        <th className="pb-1.5 font-bold text-right">%</th>
+                      <tr>
+                        <th>Zona</th>
+                        <th className="text-right">Precio</th>
+                        <th className="text-right">Capacidad</th>
+                        <th className="text-right">Vendidos</th>
+                        <th className="text-right">Disponibles</th>
+                        <th className="text-right">Revenue</th>
+                        <th className="text-right">%</th>
                       </tr>
                     </thead>
                     <tbody>
                       {eventZoneDetails.map((z, idx) => (
-                        <tr key={idx} className="border-b border-gray-50 last:border-0">
-                          <td className="py-1.5 font-bold text-gray-900">{z.zone_name}</td>
-                          <td className="py-1.5 text-right text-gray-600">{z.capacity}</td>
-                          <td className="py-1.5 text-right text-gray-600">{z.sold}</td>
-                          <td className={`py-1.5 text-right font-bold ${z.available < 50 ? 'text-red-500' : 'text-gray-600'}`}>{z.available}</td>
-                          <td className="py-1.5 text-right">
-                            <span className={`font-black ${z.percentage >= 80 ? 'text-red-500' : z.percentage >= 50 ? 'text-amber-500' : 'text-gray-400'}`}>
+                        <tr key={idx}>
+                          <td className="font-bold">{z.zone_name}</td>
+                          <td className="text-right">${z.price.toLocaleString()}</td>
+                          <td className="text-right">{z.capacity}</td>
+                          <td className="text-right">{z.sold}</td>
+                          <td className={`text-right font-bold ${z.available < 50 ? 'text-red-500' : ''}`}>{z.available}</td>
+                          <td className="text-right font-bold text-[#EF4444]">${z.revenue.toLocaleString()}</td>
+                          <td className="text-right">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-bold text-white ${z.percentage >= 80 ? 'bg-red-500' : z.percentage >= 50 ? 'bg-yellow-500' : 'bg-green-500'}`}>
                               {z.percentage}%
                             </span>
                           </td>
                         </tr>
                       ))}
+                      {eventZoneDetails.length > 1 && (
+                        <tr className="total-row">
+                          <td className="font-bold">Total</td>
+                          <td></td>
+                          <td className="text-right">{eventZoneDetails.reduce((s, z) => s + z.capacity, 0)}</td>
+                          <td className="text-right">{eventZoneDetails.reduce((s, z) => s + z.sold, 0)}</td>
+                          <td className="text-right">{eventZoneDetails.reduce((s, z) => s + z.available, 0)}</td>
+                          <td className="text-right font-bold">${eventZoneDetails.reduce((s, z) => s + z.revenue, 0).toLocaleString()}</td>
+                          <td></td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -694,25 +735,25 @@ export default function SummaryPage() {
               <span className="font-bold text-gray-900 text-sm">Boletos Vendidos</span>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-xs sm:text-sm">
+              <table className="data-table">
                 <thead>
-                  <tr className="text-left text-xs text-gray-500 border-b">
-                    <th className="px-3 py-1.5 font-medium">Ticket</th>
-                    <th className="px-3 py-1.5 font-medium">Cliente</th>
-                    <th className="px-3 py-1.5 font-medium hidden sm:table-cell">Evento</th>
-                    <th className="px-3 py-1.5 font-medium hidden md:table-cell">Zona</th>
-                    <th className="px-3 py-1.5 font-medium">Estado</th>
+                  <tr>
+                    <th>Ticket</th>
+                    <th>Cliente</th>
+                    <th className="hidden sm:table-cell">Evento</th>
+                    <th className="hidden md:table-cell">Zona</th>
+                    <th>Estado</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedBoletos.map((b) => (
-                    <tr key={b.id} className="border-b border-gray-50 last:border-0">
-                      <td className="px-3 py-1.5 font-mono text-xs text-[#EF4444]">{b.ticket}</td>
-                      <td className="px-3 py-1.5 text-gray-900 truncate max-w-[100px] sm:max-w-none">{b.cliente}</td>
-                      <td className="px-3 py-1.5 text-gray-600 truncate max-w-[120px] hidden sm:table-cell">{b.evento}</td>
-                      <td className="px-3 py-1.5 text-gray-500 hidden md:table-cell">{b.zona}</td>
-                      <td className="px-3 py-1.5">
-                        <span className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${b.status === 'valid' ? 'bg-green-50 text-green-700' : b.status === 'used' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                    <tr key={b.id}>
+                      <td className="font-mono text-[#EF4444] font-bold">{b.ticket}</td>
+                      <td className="truncate max-w-[100px] sm:max-w-none">{cleanDisplayName(b.cliente)}</td>
+                      <td className="hidden sm:table-cell">{b.evento}</td>
+                      <td className="hidden md:table-cell">{b.zona}</td>
+                      <td>
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-bold text-white ${b.status === 'valid' ? 'bg-green-500' : b.status === 'used' ? 'bg-blue-500' : 'bg-gray-400'}`}>
                           {b.status === 'valid' ? 'Válido' : b.status === 'used' ? 'Usado' : b.status}
                         </span>
                       </td>
