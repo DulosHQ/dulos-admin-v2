@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import HeroMetrics from '../components/HeroMetrics';
 import type { MetricData } from '../components/HeroMetrics';
 import {
-  fetchEvents,
+  fetchAllEvents,
   fetchZones,
   fetchAllOrders,
   fetchCheckins,
@@ -89,8 +89,14 @@ function getActividadIcon(tipo: string): string {
 }
 
 function cleanDisplayName(name: string): string {
-  // Filter UUID-style names (e.g. dc669af6-fb18-4519-...)
+  if (!name) return 'Cliente';
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-/.test(name)) return 'Cliente';
+  return name;
+}
+
+function cleanEventName(name: string): string {
+  if (!name) return 'Evento';
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-/.test(name)) return 'Evento';
   return name;
 }
 
@@ -164,7 +170,7 @@ export default function SummaryPage() {
     async function loadData() {
       try {
         const [events, zones, orders, checkins, escalations, tickets, schedules, venues, salesData] = await Promise.all([
-          fetchEvents().catch(() => [] as DulosEvent[]),
+          fetchAllEvents().catch(() => [] as DulosEvent[]),
           fetchZones().catch(() => [] as TicketZone[]),
           fetchAllOrders().catch(() => [] as Order[]),
           fetchCheckins().catch(() => [] as Checkin[]),
@@ -351,7 +357,7 @@ export default function SummaryPage() {
               actividades.push({
                 id: `tk-${ticket.id}`,
                 tipo: 'venta',
-                mensaje: `${displayName} \u2192 ${eventName}`,
+                mensaje: `${displayName} \u2192 ${cleanEventName(eventName)}`,
                 tiempo: formatTimeAgo(ticket.created_at),
                 monto: price > 0 ? price : undefined,
               });
@@ -370,7 +376,7 @@ export default function SummaryPage() {
               actividades.push({
                 id: `ci-${checkin.id}`,
                 tipo: 'checkin',
-                mensaje: `${checkinDisplayName} \u2192 ${checkin.event_name}`,
+                mensaje: `${checkinDisplayName} \u2192 ${cleanEventName(checkin.event_name)}`,
                 tiempo: formatTimeAgo(checkin.scanned_at),
               });
             }
@@ -408,7 +414,7 @@ export default function SummaryPage() {
           id: t.id,
           ticket: t.ticket_number,
           cliente: t.customer_name || 'Anónimo',
-          evento: eventMap.get(t.event_id)?.name || t.event_id,
+          evento: cleanEventName(eventMap.get(t.event_id)?.name || t.event_id),
           zona: t.zone_name,
           status: t.status,
           fecha: formatTimeAgo(t.created_at),
