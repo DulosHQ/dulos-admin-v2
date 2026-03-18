@@ -1040,18 +1040,10 @@ export default function FinancePage() {
 
       {/* ====== TRANSACCIONES TAB ====== */}
       {activeTab === 'transacciones' && (
-        <div className="section-card animate-fade-in">
-          <div className="section-card-header">
-            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-            </svg>
-            <span className="section-card-title">Historial de Transacciones</span>
-            <span className="ml-auto text-xs sm:text-sm text-gray-500">{processedTransactions.total} registros</span>
-          </div>
-
-          {/* Search bar */}
-          <div className="px-3 sm:px-5 py-3 border-b border-gray-100">
-            <div className="relative">
+        <div className="space-y-3 animate-fade-in">
+          {/* Search + count — compact row */}
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -1060,87 +1052,75 @@ export default function FinancePage() {
                 placeholder="Buscar por ticket, cliente, evento..."
                 value={txSearch}
                 onChange={e => setTxSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#EF4444] focus:border-[#EF4444]"
+                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#EF4444] focus:border-[#EF4444]"
               />
             </div>
+            <span className="text-xs text-gray-500 whitespace-nowrap">{processedTransactions.total} registros</span>
           </div>
 
-          <div className="section-card-body p-0">
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <SortHeader col="id" label="ID" />
-                    <SortHeader col="date" label="Fecha" />
-                    <SortHeader col="customer_name" label="Cliente" />
-                    <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] cursor-pointer select-none hover:text-gray-300 transition-colors whitespace-nowrap hidden md:table-cell" onClick={() => toggleSort('event_name')}>
-                      <span className="inline-flex items-center gap-1">Evento{txSort.col === 'event_name' && <svg className={`w-3 h-3 transition-transform ${txSort.asc ? '' : 'rotate-180'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>}</span>
-                    </th>
-                    <th className="text-left py-3 px-2 sm:px-3 font-bold text-white text-[11px] sm:text-[13px] cursor-pointer select-none hover:text-gray-300 transition-colors whitespace-nowrap hidden lg:table-cell" onClick={() => toggleSort('zone_name')}>
-                      <span className="inline-flex items-center gap-1">Zona{txSort.col === 'zone_name' && <svg className={`w-3 h-3 transition-transform ${txSort.asc ? '' : 'rotate-180'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>}</span>
-                    </th>
-                    <SortHeader col="amount" label="Monto" />
-                    <SortHeader col="status" label="Estado" />
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="data-table text-xs">
+              <thead>
+                <tr>
+                  <th className="cursor-pointer" onClick={() => toggleSort('id')}>
+                    <span className="inline-flex items-center gap-1">ID{txSort.col === 'id' && <span className={txSort.asc ? '' : 'rotate-180 inline-block'}>▲</span>}</span>
+                  </th>
+                  <th className="cursor-pointer" onClick={() => toggleSort('date')}>
+                    <span className="inline-flex items-center gap-1">Fecha{txSort.col === 'date' && <span className={txSort.asc ? '' : 'rotate-180 inline-block'}>▲</span>}</span>
+                  </th>
+                  <th className="cursor-pointer" onClick={() => toggleSort('customer_name')}>Cliente</th>
+                  <th className="cursor-pointer hidden md:table-cell" onClick={() => toggleSort('event_name')}>Evento</th>
+                  <th className="cursor-pointer hidden lg:table-cell" onClick={() => toggleSort('zone_name')}>Zona</th>
+                  <th className="text-right cursor-pointer" onClick={() => toggleSort('amount')}>Monto</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {processedTransactions.items.length > 0 ? processedTransactions.items.map((tx, i) => (
+                  <tr key={`${tx.id}-${i}`}>
+                    <td className="font-mono text-[#EF4444] font-bold">{/^[0-9a-fA-F]{8}-/.test(tx.id) ? tx.id.substring(0, 8) + '…' : tx.id}</td>
+                    <td className="text-gray-500 whitespace-nowrap">
+                      {new Date(tx.date).toLocaleString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td>
+                      <div className="font-bold truncate max-w-[120px]">{tx.customer_name || 'Sin nombre'}</div>
+                      <div className="text-gray-400 text-[10px] truncate max-w-[120px]">{tx.customer_email || ''}</div>
+                    </td>
+                    <td className="hidden md:table-cell">{tx.event_name}</td>
+                    <td className="hidden lg:table-cell">{tx.zone_name}</td>
+                    <td className="text-right font-bold">{fmtCurrency(tx.amount)}</td>
+                    <td>
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${
+                        tx.status === 'Completado' ? 'bg-green-500' :
+                        tx.status === 'Reembolsado' ? 'bg-red-500' :
+                        tx.status === 'Usado' ? 'bg-blue-500' : 'bg-yellow-500'
+                      }`}>
+                        {tx.status}
+                      </span>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {processedTransactions.items.length > 0 ? processedTransactions.items.map(tx => (
-                    <tr key={tx.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] font-mono text-[#EF4444] font-bold">{/^[0-9a-fA-F]{8}-/.test(tx.id) ? tx.id.substring(0, 8) + '…' : tx.id}</td>
-                      <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] text-gray-500 whitespace-nowrap">
-                        {new Date(tx.date).toLocaleString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px]">
-                        <div className="font-bold truncate max-w-[100px] sm:max-w-none">{tx.customer_name || 'Sin nombre'}</div>
-                        <div className="text-gray-500 text-[10px] sm:text-xs truncate max-w-[100px] sm:max-w-none">{tx.customer_email || '—'}</div>
-                      </td>
-                      <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] text-gray-600 hidden md:table-cell">{tx.event_name}</td>
-                      <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] text-gray-600 hidden lg:table-cell">{tx.zone_name}</td>
-                      <td className="py-2 px-2 sm:px-3 text-[11px] sm:text-[13px] font-bold text-gray-900">{fmtCurrency(tx.amount)}</td>
-                      <td className="py-2 px-2 sm:px-3 text-center">
-                        <span className={`inline-block px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold text-white ${
-                          tx.status === 'Completado' ? 'bg-green-500' :
-                          tx.status === 'Reembolsado' ? 'bg-red-500' :
-                          tx.status === 'Usado' ? 'bg-blue-500' : 'bg-yellow-500'
-                        }`}>
-                          {tx.status}
-                        </span>
-                      </td>
-                    </tr>
-                  )) : (
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-gray-500 text-sm">No hay transacciones disponibles</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {processedTransactions.total > PER_PAGE && (
-              <div className="flex items-center justify-between px-3 sm:px-5 py-3 border-t border-gray-100">
-                <span className="text-xs sm:text-sm text-gray-500">
-                  {txPage * PER_PAGE + 1}-{Math.min((txPage + 1) * PER_PAGE, processedTransactions.total)} de {processedTransactions.total}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setTxPage(p => Math.max(0, p - 1))}
-                    disabled={txPage === 0}
-                    className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
-                  >
-                    Anterior
-                  </button>
-                  <button
-                    onClick={() => setTxPage(p => p + 1)}
-                    disabled={(txPage + 1) * PER_PAGE >= processedTransactions.total}
-                    className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
-                  >
-                    Siguiente
-                  </button>
-                </div>
-              </div>
-            )}
+                )) : (
+                  <tr><td colSpan={7} className="text-center py-6 text-gray-400">No hay transacciones</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
+
+          {/* Pagination — tight */}
+          {processedTransactions.total > PER_PAGE && (
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500">
+                {txPage * PER_PAGE + 1}–{Math.min((txPage + 1) * PER_PAGE, processedTransactions.total)} de {processedTransactions.total}
+              </span>
+              <div className="flex gap-2">
+                <button onClick={() => setTxPage(p => Math.max(0, p - 1))} disabled={txPage === 0}
+                  className="px-3 py-1 text-xs border border-gray-200 rounded disabled:opacity-40 hover:bg-gray-50">← Anterior</button>
+                <button onClick={() => setTxPage(p => p + 1)} disabled={(txPage + 1) * PER_PAGE >= processedTransactions.total}
+                  className="px-3 py-1 text-xs border border-gray-200 rounded disabled:opacity-40 hover:bg-gray-50">Siguiente →</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
