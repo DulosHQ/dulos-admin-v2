@@ -16,12 +16,14 @@ import {
   fetchRevenueByEvent,
   fetchSalesSummary,
   fetchTransactionsPaginated,
+  fetchEventSections,
   DulosEvent,
   TicketZone,
   Ticket,
   Order,
   Schedule,
   SalesSummary,
+  EventSection,
 } from '../lib/supabase';
 
 type TabKey = 'ingresos' | 'capacidad' | 'tendencias' | 'transacciones' | 'comisiones';
@@ -145,6 +147,9 @@ export default function FinancePage() {
 
   // UI state
   const [expandedCapacity, setExpandedCapacity] = useState<number | null>(null);
+  const [expandedRevenueEvent, setExpandedRevenueEvent] = useState<string | null>(null);
+  const [expandedEventZones, setExpandedEventZones] = useState<TicketZone[]>([]);
+  const [expandedEventSections, setExpandedEventSections] = useState<EventSection[]>([]);
   const [txSearch, setTxSearch] = useState('');
   const [txSort, setTxSort] = useState<{ col: keyof Transaction; asc: boolean }>({ col: 'date', asc: false });
   const [txPage, setTxPage] = useState(0);
@@ -503,6 +508,25 @@ export default function FinancePage() {
     };
   }, [loading, events, rawZones, rawTickets, rawSchedules, rawEventRevenues, salesSummary, rawOrders, pedidosData, selectedEvent, dateRange]);
 
+  // Handle revenue event drill-down
+  const handleRevenueEventClick = async (eventId: string) => {
+    if (expandedRevenueEvent === eventId) {
+      setExpandedRevenueEvent(null);
+      setExpandedEventZones([]);
+      setExpandedEventSections([]);
+      return;
+    }
+    setExpandedRevenueEvent(eventId);
+    // Fetch zones for this event
+    const zones = rawZones.filter(z => z.event_id === eventId);
+    setExpandedEventZones(zones);
+    // Try to fetch event sections (Paolo's seat architecture)
+    try {
+      const sections = await fetchEventSections(eventId);
+      setExpandedEventSections(sections);
+    } catch { setExpandedEventSections([]); }
+  };
+
   // Reset txPage when filters change
   useEffect(() => { setTxPage(0); }, [selectedEvent, dateRange, txSearch, txSort]);
 
@@ -758,14 +782,22 @@ export default function FinancePage() {
                   {eventRevenues.length > 0 ? eventRevenues.map(event => {
                     const totalRev = eventRevenues.reduce((s, e) => s + e.revenue, 0);
                     const pct = totalRev > 0 ? Math.round((event.revenue / totalRev) * 100) : 0;
+                    const isExpanded = expandedRevenueEvent === event.event_id;
+                    const eventObj = events.find(e => e.id === event.event_id);
+                    const eventType = eventObj?.event_type || 'general';
                     return (
-                      <tr key={event.event_id}>
+                      <React.Fragment key={event.event_id}>
+                      <tr onClick={() => handleRevenueEventClick(event.event_id)} className={`cursor-pointer ${isExpanded ? 'bg-red-50' : ''}`}>
                         <td>
                           <div className="flex items-center gap-2">
                             {event.image_url && (
                               <img src={event.image_url} alt={event.event_name} className="w-8 h-8 rounded object-cover flex-shrink-0" />
                             )}
-                            <span className="font-bold truncate">{event.event_name}</span>
+                            <div>
+                              <span className="font-bold truncate">{event.event_name}</span>
+                              <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{eventType}</span>
+                            </div>
+                            <svg className={`w-4 h-4 text-gray-400 transition-transform ml-auto flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                           </div>
                         </td>
                         <td className="text-right">{event.tickets.toLocaleString()}</td>
@@ -781,6 +813,79 @@ export default function FinancePage() {
                           </div>
                         </td>
                       </tr>
+                      {/* Drill-down: Zone breakdown + Sections (Paolo) */}
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={6} className="bg-gray-50 p-4">
+                            <div className="space-y-3">
+                              {/* Zone revenue breakdown */}
+                              {expandedEventZones.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-bold text-gray-500 uppercase mb-2">Desglose por Zona</p>
+                                  <table className="w-full text-xs">
+                                    <thead className="bg-[#1a1a2e] text-white">
+                                      <tr>
+                                        <th className="px-3 py-2 text-left font-bold text-xs">Zona</th>
+                                        <th className="px-3 py-2 text-right font-bold text-xs">Precio</th>
+                                        <th className="px-3 py-2 text-right font-bold text-xs">Vendidos</th>
+                                        <th className="px-3 py-2 text-right font-bold text-xs">Disponibles</th>
+                                        <th className="px-3 py-2 text-right font-bold text-xs">Revenue</th>
+                                        <th className="px-3 py-2 text-right font-bold text-xs">%</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {expandedEventZones.map((z, i) => {
+                                        const cap = z.sold + z.available;
+                                        const occPct = cap > 0 ? Math.round((z.sold / cap) * 100) : 0;
+                                        return (
+                                          <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                                            <td className="px-3 py-2 font-bold">{z.zone_name}</td>
+                                            <td className="px-3 py-2 text-right">{fmtCurrency(z.price)}</td>
+                                            <td className="px-3 py-2 text-right">{z.sold}</td>
+                                            <td className="px-3 py-2 text-right">{z.available}</td>
+                                            <td className="px-3 py-2 text-right font-bold text-[#EF4444]">{fmtCurrency(z.sold * z.price)}</td>
+                                            <td className="px-3 py-2 text-right">
+                                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${occPct >= 80 ? 'bg-red-500' : occPct >= 50 ? 'bg-yellow-500' : 'bg-green-500'}`}>
+                                                {occPct}%
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                              {/* Paolo's Event Sections (if event has reserved/hybrid seating) */}
+                              {expandedEventSections.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-bold text-gray-500 uppercase mb-2">Secciones de Asientos (Paolo)</p>
+                                  <table className="w-full text-xs">
+                                    <thead className="bg-[#1a1a2e] text-white">
+                                      <tr>
+                                        <th className="px-3 py-2 text-left font-bold text-xs">Sección</th>
+                                        <th className="px-3 py-2 text-right font-bold text-xs">Capacidad</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {expandedEventSections.map((s, i) => (
+                                        <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                                          <td className="px-3 py-2 font-bold">{s.name}</td>
+                                          <td className="px-3 py-2 text-right">{s.capacity}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                              {expandedEventZones.length === 0 && expandedEventSections.length === 0 && (
+                                <p className="text-xs text-gray-400">Sin datos de zonas o secciones para este evento</p>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
                     );
                   }) : (
                     <tr><td colSpan={6} className="text-center py-4">No hay datos de eventos disponibles</td></tr>
