@@ -224,9 +224,15 @@ export default function FinancePage() {
     const filteredSchedules = selectedEvent ? rawSchedules.filter(s => s.event_id === selectedEvent) : rawSchedules;
 
     // Event revenues from sales summary (REAL DATA)
+    // Detect duplicate event names to show venue for disambiguation
+    const nameCount = new Map<string, number>();
+    filteredSalesSummary.forEach(s => nameCount.set(s.event_name, (nameCount.get(s.event_name) || 0) + 1));
+
     const eventRevenues = filteredSalesSummary.map(s => ({
       event_id: s.event_id,
       event_name: s.event_name,
+      venue_name: s.venue_name || '',
+      show_venue: (nameCount.get(s.event_name) || 0) > 1, // show venue when name is duplicated
       revenue: s.total_revenue,
       orders: s.total_orders,
       tickets: s.total_tickets_sold,
@@ -453,6 +459,8 @@ export default function FinancePage() {
       events: filteredSalesSummary.map(s => ({
         event_id: s.event_id,
         event_name: s.event_name,
+        venue_name: s.venue_name || '',
+        show_venue: (nameCount.get(s.event_name) || 0) > 1,
         revenue: s.total_revenue,
         commission: s.total_revenue * 0.15,
         producer: s.total_revenue * 0.85,
@@ -812,6 +820,9 @@ export default function FinancePage() {
                             )}
                             <div>
                               <span className="font-bold truncate">{event.event_name}</span>
+                              {event.show_venue && event.venue_name && (
+                                <span className="ml-1 text-[10px] text-gray-400">· {event.venue_name}</span>
+                              )}
                               <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{eventType}</span>
                             </div>
                             <svg className={`w-4 h-4 text-gray-400 transition-transform ml-auto flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -1164,6 +1175,9 @@ export default function FinancePage() {
                           <img src={event.image_url} alt={event.event_name} className="w-6 h-6 rounded object-cover flex-shrink-0" />
                         )}
                         <span className="font-bold">{event.event_name}</span>
+                        {event.show_venue && event.venue_name && (
+                          <span className="ml-1 text-[10px] text-gray-400">· {event.venue_name}</span>
+                        )}
                       </div>
                     </td>
                     <td className="text-right">{event.tickets.toLocaleString()}</td>
