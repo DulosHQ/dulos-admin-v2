@@ -328,13 +328,23 @@ export default function FinancePage() {
     const capacityStats = { critical, high, normal, totalCapacity };
 
     // --- Transactions ---
+    // Build customer lookup from orders (tickets often lack customer_name)
+    const orderCustomerMap = new Map<string, { name: string; email: string }>();
+    rawOrders.forEach(o => {
+      if (o.id) orderCustomerMap.set(o.id, { name: o.customer_name || '', email: o.customer_email || '' });
+    });
+
     const transactions: Transaction[] = filteredTickets.map(ticket => {
       const event = eventMap.get(ticket.event_id);
       const price = zonePriceMap.get(`${ticket.event_id}:${ticket.zone_name}`) || 0;
+      // Resolve customer from order if ticket has no name
+      const orderInfo = ticket.order_id ? orderCustomerMap.get(ticket.order_id) : undefined;
+      const customerName = ticket.customer_name || orderInfo?.name || '';
+      const customerEmail = ticket.customer_email || orderInfo?.email || '';
       return {
         id: ticket.ticket_number,
-        customer_name: ticket.customer_name,
-        customer_email: ticket.customer_email,
+        customer_name: customerName,
+        customer_email: customerEmail,
         event_name: event?.name || ticket.event_id,
         zone_name: ticket.zone_name,
         amount: price,
