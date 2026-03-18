@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  BarChart, Bar, PieChart, Pie, Cell,
+  BarChart, Bar,
 } from 'recharts';
 import FinanceScorecard from '../components/FinanceScorecard';
-import CapacityBars from '../components/CapacityBars';
+// CapacityBars removed — capacity integrated into Ingresos table
 import {
   fetchZones,
   fetchAllOrders,
@@ -26,7 +26,7 @@ import {
   EventSection,
 } from '../lib/supabase';
 
-type TabKey = 'ingresos' | 'capacidad' | 'tendencias' | 'transacciones' | 'comisiones';
+type TabKey = 'ingresos' | 'tendencias' | 'transacciones' | 'comisiones';
 type DateRange = '7d' | '30d' | '90d' | 'all';
 
 interface ScheduleDisplay {
@@ -56,7 +56,6 @@ interface ZoneRevenue {
 
 const tabs: { key: TabKey; label: string }[] = [
   { key: 'ingresos', label: 'Ingresos' },
-  { key: 'capacidad', label: 'Capacidad' },
   { key: 'tendencias', label: 'Tendencias' },
   { key: 'transacciones', label: 'Transacciones' },
   { key: 'comisiones', label: 'Comisiones' },
@@ -775,7 +774,9 @@ export default function FinancePage() {
                     <th className="text-right">Órdenes</th>
                     <th className="text-right">Revenue</th>
                     <th className="text-right">Comisión (15%)</th>
-                    <th className="text-right">% del Total</th>
+                    <th className="text-right">Capacidad</th>
+                    <th className="text-right">Ocupación</th>
+                    <th className="text-right">% Rev</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -785,6 +786,12 @@ export default function FinancePage() {
                     const isExpanded = expandedRevenueEvent === event.event_id;
                     const eventObj = events.find(e => e.id === event.event_id);
                     const eventType = eventObj?.event_type || 'general';
+                    // Capacity from schedules
+                    const eventSchedules = schedulesDisplay.filter(s => s.eventId === event.event_id);
+                    const totalCap = eventSchedules.reduce((s, sc) => s + sc.capacity, 0);
+                    const totalSold = eventSchedules.reduce((s, sc) => s + sc.sold, 0);
+                    const occPct = totalCap > 0 ? Math.round((totalSold / totalCap) * 100) : 0;
+                    const occBadge = occPct > 80 ? { cls: 'bg-red-500', label: 'CRÍTICO' } : occPct >= 50 ? { cls: 'bg-yellow-500', label: 'ALTO' } : { cls: 'bg-green-500', label: 'NORMAL' };
                     return (
                       <React.Fragment key={event.event_id}>
                       <tr onClick={() => handleRevenueEventClick(event.event_id)} className={`cursor-pointer ${isExpanded ? 'bg-red-50' : ''}`}>
@@ -804,19 +811,18 @@ export default function FinancePage() {
                         <td className="text-right">{event.orders.toLocaleString()}</td>
                         <td className="text-right font-bold">{fmtCurrency(event.revenue)}</td>
                         <td className="text-right font-bold text-[#EF4444]">{fmtCurrency(event.revenue * 0.15)}</td>
+                        <td className="text-right text-gray-500">{totalCap > 0 ? totalCap.toLocaleString() : '—'}</td>
                         <td className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
-                              <div className="h-full bg-[#EF4444] rounded-full" style={{ width: `${pct}%` }} />
-                            </div>
-                            <span className="font-bold text-gray-900 w-8 text-right">{pct}%</span>
-                          </div>
+                          {totalCap > 0 ? (
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${occBadge.cls}`}>{occPct}%</span>
+                          ) : '—'}
                         </td>
+                        <td className="text-right font-bold text-gray-900">{pct}%</td>
                       </tr>
                       {/* Drill-down: Zone breakdown + Sections (Paolo) */}
                       {isExpanded && (
                         <tr>
-                          <td colSpan={6} className="bg-gray-50 p-4">
+                          <td colSpan={8} className="bg-gray-50 p-4">
                             <div className="space-y-3">
                               {/* Zone revenue breakdown */}
                               {expandedEventZones.length > 0 && (
@@ -888,18 +894,25 @@ export default function FinancePage() {
                       </React.Fragment>
                     );
                   }) : (
-                    <tr><td colSpan={6} className="text-center py-4">No hay datos de eventos disponibles</td></tr>
+                    <tr><td colSpan={8} className="text-center py-4">No hay datos de eventos disponibles</td></tr>
                   )}
-                  {eventRevenues.length > 1 && (
+                  {eventRevenues.length > 1 && (() => {
+                    const totalCap = schedulesDisplay.reduce((s, sc) => s + sc.capacity, 0);
+                    const totalSoldCap = schedulesDisplay.reduce((s, sc) => s + sc.sold, 0);
+                    const totalOcc = totalCap > 0 ? Math.round((totalSoldCap / totalCap) * 100) : 0;
+                    return (
                     <tr className="total-row">
                       <td className="font-bold">Total</td>
                       <td className="text-right">{eventRevenues.reduce((s, e) => s + e.tickets, 0).toLocaleString()}</td>
                       <td className="text-right">{eventRevenues.reduce((s, e) => s + e.orders, 0).toLocaleString()}</td>
                       <td className="text-right font-bold">{fmtCurrency(eventRevenues.reduce((s, e) => s + e.revenue, 0))}</td>
                       <td className="text-right font-bold">{fmtCurrency(eventRevenues.reduce((s, e) => s + e.revenue, 0) * 0.15)}</td>
+                      <td className="text-right">{totalCap.toLocaleString()}</td>
+                      <td className="text-right font-bold">{totalOcc}%</td>
                       <td></td>
                     </tr>
-                  )}
+                    );
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -940,244 +953,76 @@ export default function FinancePage() {
       )}
 
       {/* ====== CAPACIDAD TAB ====== */}
-      {activeTab === 'capacidad' && (
-        <div className="space-y-4 animate-fade-in">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-bold text-gray-700">Ocupación por Función</span>
-            <div className="flex gap-3 text-[10px]">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" />Crítico (&gt;80%)</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" />Alto (50-80%)</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />Normal (&lt;50%)</span>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Evento</th>
-                  <th>Fecha</th>
-                  <th className="text-right">Capacidad</th>
-                  <th className="text-right">Vendidos</th>
-                  <th className="text-right">Disponibles</th>
-                  <th className="text-right">Ocupación</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {schedulesDisplay.length > 0 ? schedulesDisplay.map((s, i) => {
-                  const disponibles = s.capacity - s.sold;
-                  const badge = s.percentage > 80 ? { cls: 'bg-red-500', label: 'CRÍTICO' } : s.percentage >= 50 ? { cls: 'bg-yellow-500', label: 'ALTO' } : { cls: 'bg-green-500', label: 'NORMAL' };
-                  const isExp = expandedCapacity === i;
-                  const zones = s.eventId && zonesByEvent ? zonesByEvent[s.eventId] : undefined;
-                  return (
-                    <React.Fragment key={i}>
-                      <tr className={`cursor-pointer ${isExp ? 'bg-red-50' : ''}`} onClick={() => setExpandedCapacity(prev => prev === i ? null : i)}>
-                        <td className="font-bold">{s.name}</td>
-                        <td className="text-xs text-gray-500">{new Date(s.date).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                        <td className="text-right">{s.capacity.toLocaleString()}</td>
-                        <td className="text-right font-bold">{s.sold.toLocaleString()}</td>
-                        <td className="text-right">{disponibles.toLocaleString()}</td>
-                        <td className="text-right font-bold">{Math.round(s.percentage)}%</td>
-                        <td>
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${badge.cls}`}>{badge.label}</span>
-                        </td>
-                      </tr>
-                      {isExp && zones && zones.length > 0 && (
-                        <tr>
-                          <td colSpan={7} className="bg-gray-50 p-3">
-                            <table className="w-full text-xs">
-                              <thead className="bg-[#1a1a2e] text-white">
-                                <tr>
-                                  <th className="px-3 py-2 text-left text-xs font-bold">Zona</th>
-                                  <th className="px-3 py-2 text-right text-xs font-bold">Vendidos</th>
-                                  <th className="px-3 py-2 text-right text-xs font-bold">Total</th>
-                                  <th className="px-3 py-2 text-right text-xs font-bold">%</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {zones.map((z, zi) => (
-                                  <tr key={zi} className="border-b border-gray-100">
-                                    <td className="px-3 py-1.5 font-bold">{z.zone_name}</td>
-                                    <td className="px-3 py-1.5 text-right">{z.sold}</td>
-                                    <td className="px-3 py-1.5 text-right">{z.total}</td>
-                                    <td className="px-3 py-1.5 text-right">
-                                      <span className={`inline-block px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${z.percentage > 80 ? 'bg-red-500' : z.percentage >= 50 ? 'bg-yellow-500' : 'bg-green-500'}`}>{Math.round(z.percentage)}%</span>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                }) : (
-                  <tr><td colSpan={7} className="text-center py-6 text-gray-400">No hay funciones programadas</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {/* Capacidad tab REMOVED — capacity data now integrated into Ingresos table */}
 
       {/* ====== TENDENCIAS TAB ====== */}
       {activeTab === 'tendencias' && (
         <div className="space-y-4 animate-fade-in">
-          {/* Two charts side by side */}
+          {/* Ventas por día + UTM side by side — compact */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Sales by day of week */}
             <div className="section-card">
               <div className="section-card-header">
-                <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                <span className="section-card-title">Ventas por Dia de la Semana</span>
+                <span className="section-card-title">Ventas por Día</span>
               </div>
               <div className="section-card-body">
-                <div style={{ width: '100%', minHeight: 250 }}>
-                  <ResponsiveContainer width="100%" height={250} minWidth={50} minHeight={200}>
-                    <BarChart data={dayOfWeekData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
-                      <XAxis dataKey="day" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={fmtAxisCurrency} width={50} />
-                      <Tooltip formatter={(v) => [fmtCurrency(Number(v)), 'Ventas']} />
-                      <Bar dataKey="sales" fill="#EF4444" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={dayOfWeekData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+                    <XAxis dataKey="day" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={fmtAxisCurrency} width={50} />
+                    <Tooltip formatter={(v) => [fmtCurrency(Number(v)), 'Ventas']} />
+                    <Bar dataKey="sales" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
 
-            {/* Occupancy by event */}
+            {/* UTM + Dispositivos as compact table */}
             <div className="section-card">
               <div className="section-card-header">
-                <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span className="section-card-title">Ocupacion Promedio por Evento</span>
+                <span className="section-card-title">Fuentes de Tráfico</span>
               </div>
-              <div className="section-card-body">
-                {eventOccupancy.length > 0 ? (
-                  <div className="space-y-3">
-                    {eventOccupancy.map((ev, i) => {
-                      const barColor = ev.occupancy > 80 ? 'bg-[#EF4444]' : ev.occupancy >= 50 ? 'bg-yellow-500' : 'bg-green-500';
-                      return (
-                        <div key={i} className="flex items-center gap-2 sm:gap-3">
-                          {ev.image_url ? (
-                            <img src={ev.image_url} alt={ev.name} className="w-6 h-6 rounded object-cover flex-shrink-0 hidden sm:block" />
-                          ) : (
-                            <div className="w-6 h-6 rounded bg-gray-200 flex-shrink-0 hidden sm:block" />
-                          )}
-                          <span className="text-xs sm:text-sm text-gray-700 w-24 sm:w-36 truncate flex-shrink-0">{ev.name}</span>
-                          <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
-                            <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${Math.min(ev.occupancy, 100)}%` }} />
-                          </div>
-                          <span className="text-xs sm:text-sm font-bold text-gray-900 w-10 sm:w-12 text-right">{ev.occupancy}%</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-center text-gray-500 text-sm py-4">No hay datos disponibles</p>
-                )}
+              <div className="section-card-body p-0">
+                <table className="data-table text-xs">
+                  <thead>
+                    <tr>
+                      <th>Fuente</th>
+                      <th className="text-right">Revenue</th>
+                      <th className="text-right">Órdenes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {utmSources.length > 0 ? utmSources.map((s, i) => (
+                      <tr key={i}>
+                        <td className="font-bold">{s.source}</td>
+                        <td className="text-right">{fmtCurrency(s.revenue)}</td>
+                        <td className="text-right">{s.count}</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={3} className="text-center py-4 text-gray-400">Sin datos de UTM</td></tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
 
-          {/* Summary card */}
-          <div className="section-card">
-            <div className="section-card-header">
-              <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-              </svg>
-              <span className="section-card-title">Resumen</span>
+          {/* Quick stats row */}
+          <div className="grid grid-cols-4 gap-3">
+            <div className="bg-white rounded-lg border border-gray-200 p-3 text-center">
+              <p className="text-[10px] text-gray-500 uppercase">Mejor día</p>
+              <p className="text-sm font-extrabold">{summaryStats.bestDay}</p>
             </div>
-            <div className="section-card-body">
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
-                  <p className="text-xs sm:text-sm text-gray-500">Mejor dia de venta</p>
-                  <p className="text-base sm:text-lg font-extrabold text-gray-900">{summaryStats.bestDay}</p>
-                </div>
-                <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
-                  <p className="text-xs sm:text-sm text-gray-500">Precio promedio</p>
-                  <p className="text-base sm:text-lg font-extrabold text-gray-900">{fmtCurrency(summaryStats.avgTicketPrice)}</p>
-                </div>
-                <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
-                  <p className="text-xs sm:text-sm text-gray-500">Evento mas popular</p>
-                  <p className="text-base sm:text-lg font-extrabold text-gray-900 truncate">{summaryStats.popularEvent}</p>
-                </div>
-                <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
-                  <p className="text-xs sm:text-sm text-gray-500">Zona mas popular</p>
-                  <p className="text-base sm:text-lg font-extrabold text-gray-900">{summaryStats.popularZone}</p>
-                </div>
-              </div>
+            <div className="bg-white rounded-lg border border-gray-200 p-3 text-center">
+              <p className="text-[10px] text-gray-500 uppercase">Ticket promedio</p>
+              <p className="text-sm font-extrabold">{fmtCurrency(summaryStats.avgTicketPrice)}</p>
             </div>
-          </div>
-
-          {/* Marketing / UTM Sources */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="section-card">
-              <div className="section-card-header">
-                <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
-                <span className="section-card-title">Fuentes de Tráfico (UTM)</span>
-              </div>
-              <div className="section-card-body">
-                {utmSources.length > 0 ? (
-                  <div className="space-y-2">
-                    {utmSources.map((s, i) => {
-                      const maxRevenue = utmSources[0]?.revenue || 1;
-                      const pct = Math.round((s.revenue / maxRevenue) * 100);
-                      return (
-                        <div key={i} className="flex items-center gap-3">
-                          <span className="text-xs font-bold text-gray-700 w-20 truncate flex-shrink-0">{s.source}</span>
-                          <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-[#EF4444] rounded-full" style={{ width: `${pct}%` }} />
-                          </div>
-                          <span className="text-xs font-bold text-gray-900 w-20 text-right flex-shrink-0">{fmtCurrency(s.revenue)}</span>
-                          <span className="text-[10px] text-gray-400 w-12 text-right flex-shrink-0">{s.count} ord.</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-center text-gray-500 text-sm py-4">Sin datos de UTM</p>
-                )}
-              </div>
+            <div className="bg-white rounded-lg border border-gray-200 p-3 text-center">
+              <p className="text-[10px] text-gray-500 uppercase">Top evento</p>
+              <p className="text-sm font-extrabold truncate">{summaryStats.popularEvent}</p>
             </div>
-
-            <div className="section-card">
-              <div className="section-card-header">
-                <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                <span className="section-card-title">Dispositivos</span>
-              </div>
-              <div className="section-card-body">
-                {deviceBreakdown.length > 0 ? (
-                  <div className="space-y-2">
-                    {deviceBreakdown.map((d, i) => {
-                      const total = deviceBreakdown.reduce((s, x) => s + x.count, 0);
-                      const pct = total > 0 ? Math.round((d.count / total) * 100) : 0;
-                      return (
-                        <div key={i} className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-gray-700 capitalize">{d.device}</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-24 h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-[#1E293B] rounded-full" style={{ width: `${pct}%` }} />
-                            </div>
-                            <span className="text-xs font-bold text-gray-900 w-10 text-right">{pct}%</span>
-                            <span className="text-[10px] text-gray-400 w-8 text-right">{d.count}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-center text-gray-500 text-sm py-4">Sin datos de dispositivos</p>
-                )}
-              </div>
+            <div className="bg-white rounded-lg border border-gray-200 p-3 text-center">
+              <p className="text-[10px] text-gray-500 uppercase">Top zona</p>
+              <p className="text-sm font-extrabold">{summaryStats.popularZone}</p>
             </div>
           </div>
         </div>
