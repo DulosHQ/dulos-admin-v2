@@ -1256,9 +1256,7 @@ export default function EventsPage() {
                       </td>
                       <td className="hidden sm:table-cell text-center text-gray-500 text-[10px]">{v.timezone?.replace('America/', '') || '—'}</td>
                       <td className="hidden sm:table-cell text-center">
-                        {v.maps_url ? (
-                          <a href={v.maps_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-blue-500 hover:underline text-[10px]">📍 Maps</a>
-                        ) : <span className="text-gray-300 text-[10px]">Sin mapa</span>}
+                        <a href={v.maps_url || `https://www.google.com/maps/search/${encodeURIComponent(v.name + ' ' + (v.city || '') + ' ' + (v.state || ''))}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-blue-500 hover:underline text-[10px]">📍 Maps</a>
                       </td>
                     </tr>
                     {/* Drill-down: events in this venue */}
@@ -1266,14 +1264,23 @@ export default function EventsPage() {
                       <tr>
                         <td colSpan={6} className="p-0 bg-[#f8f6f6]">
                           <div className="p-3 space-y-2">
-                            <p className="text-xs font-bold text-gray-600">Eventos en {v.name}:</p>
+                            {/* Venue info header */}
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <div>
+                                <p className="text-xs font-bold text-gray-700">{v.name}</p>
+                                <p className="text-[10px] text-gray-500">{geo} · Cap. {v.capacity?.toLocaleString() || '?'} · {v.has_seatmap ? 'Asientos numerados' : 'Admisión general (GA)'}</p>
+                              </div>
+                              <a href={v.maps_url || `https://www.google.com/maps/search/${encodeURIComponent(v.name + ' ' + (v.city || '') + ' ' + (v.state || ''))}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline">📍 Ver en Maps</a>
+                            </div>
+                            {/* Events in this venue */}
+                            <p className="text-[10px] font-bold text-gray-500 uppercase mt-2">Eventos ({venueEvents.length})</p>
                             {venueEvents.length > 0 ? (
                               <table className="w-full text-xs">
                                 <thead><tr className="text-[10px] text-gray-500 border-b border-gray-200">
                                   <th className="text-left py-1 px-2">Evento</th>
                                   <th className="text-center py-1 px-2">Tipo</th>
                                   <th className="text-center py-1 px-2">Zonas</th>
-                                  <th className="text-center py-1 px-2">Fecha</th>
+                                  <th className="text-center py-1 px-2 hidden sm:table-cell">Fecha</th>
                                   <th className="text-center py-1 px-2">Status</th>
                                 </tr></thead>
                                 <tbody>
@@ -1281,12 +1288,15 @@ export default function EventsPage() {
                                     const proj = projects.find(p => p.events.some(e => e.id === ev.id));
                                     const evZones = proj?.events.find(e => e.id === ev.id)?.zones || [];
                                     const zTypes = [...new Set(evZones.map(z => z.tipo).filter(Boolean))];
+                                    // Event emoji based on name keywords
+                                    const nm = (ev.name || '').toLowerCase();
+                                    const emoji = nm.includes('sinfón') || nm.includes('orquest') ? '🎵' : nm.includes('teatro') || nm.includes('obra') || nm.includes('mariposa') ? '🎭' : nm.includes('karen') || nm.includes('comedia') ? '😂' : nm.includes('infierno') || nm.includes('horror') ? '🔥' : nm.includes('lucero') ? '⭐' : '🎪';
                                     return (
                                       <tr key={ev.id} className="border-b border-gray-100">
-                                        <td className="py-1.5 px-2 font-bold">{ev.name}</td>
+                                        <td className="py-1.5 px-2 font-bold">{emoji} {ev.name}</td>
                                         <td className="py-1.5 px-2 text-center">{getEventTypeBadge(ev.event_type)}</td>
                                         <td className="py-1.5 px-2 text-center">{zTypes.length > 0 ? zTypes.map((t, i) => <span key={i} className="mr-0.5">{getZoneTypeBadge(t)}</span>) : <span className="badge badge-ga">GA</span>}</td>
-                                        <td className="py-1.5 px-2 text-center text-gray-500">{ev.start_date ? new Date(ev.start_date).toLocaleDateString('es-MX', {day:'numeric',month:'short'}) : '—'}</td>
+                                        <td className="py-1.5 px-2 text-center text-gray-500 hidden sm:table-cell">{ev.start_date ? new Date(ev.start_date).toLocaleDateString('es-MX', {day:'numeric',month:'short'}) : '—'}</td>
                                         <td className="py-1.5 px-2 text-center"><span className={`badge ${ev.status === 'active' ? 'badge-success' : ev.status === 'draft' ? 'badge-warning' : 'badge-info'}`}>{ev.status === 'active' ? 'Activo' : ev.status || '—'}</span></td>
                                       </tr>
                                     );
@@ -1294,10 +1304,7 @@ export default function EventsPage() {
                                 </tbody>
                               </table>
                             ) : (
-                              <p className="text-xs text-gray-400">Sin eventos en este recinto</p>
-                            )}
-                            {v.maps_url && (
-                              <a href={v.maps_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline mt-1">📍 Ver en Google Maps</a>
+                              <p className="text-xs text-gray-400 py-2">Sin eventos registrados</p>
                             )}
                           </div>
                         </td>
