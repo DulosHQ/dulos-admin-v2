@@ -63,6 +63,7 @@ interface EventDisplay {
 interface ZoneDisplay {
   id: string;
   nombre: string;
+  tipo?: string; // ga | numbered | hybrid
   precio: number;
   capacidad: number;
   vendidos: number;
@@ -110,12 +111,22 @@ type ProjectFormData = z.infer<typeof projectSchema>;
 
 /* ─── Helpers ─── */
 
+// Dimension 1: event_type (single/recurring/multiday)
 const getEventTypeBadge = (eventType?: string) => {
   switch (eventType) {
-    case 'ga': return '🎫';
-    case 'reserved': return '💺';
-    case 'hybrid': return '🔀';
-    default: return '🎫';
+    case 'recurring': return <span className="badge badge-recurring">Recurrente</span>;
+    case 'multiday': return <span className="badge badge-multiday">Multiday</span>;
+    case 'single': return <span className="badge badge-single">Único</span>;
+    default: return <span className="badge badge-single">Único</span>;
+  }
+};
+
+// Dimension 2: zone_type (ga/reserved/hybrid) — per zone
+const getZoneTypeBadge = (zoneType?: string) => {
+  switch (zoneType) {
+    case 'reserved': case 'numbered': return <span className="badge badge-reserved">Numerado</span>;
+    case 'hybrid': return <span className="badge badge-hybrid">Mixto</span>;
+    case 'ga': default: return <span className="badge badge-ga">GA</span>;
   }
 };
 
@@ -465,15 +476,17 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
   const occupancy = totalCapacity > 0 ? (totalSold / totalCapacity) * 100 : 0;
 
   // Use real occupancy from v_event_dashboard if available, fallback to manual zones
+  const projectZones = project.events.flatMap((e) => e.zones);
   const allZones: ZoneDisplay[] = eventDashZones.length > 0
     ? eventDashZones.map((d, idx) => ({
         id: `dash-${eventId}-${idx}`,
         nombre: d.zone_name,
+        tipo: projectZones.find(pz => pz.nombre === d.zone_name)?.tipo,
         precio: d.zone_price,
         capacidad: d.zone_sold + d.zone_available,
         vendidos: d.zone_sold,
       }))
-    : project.events.flatMap((e) => e.zones);
+    : projectZones;
   const allSchedules = project.events.flatMap((e) => e.schedules);
 
   const firstEvent = project.events[0];
@@ -497,7 +510,14 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
               </div>
             )}
             <h3 className="font-bold text-gray-900 mt-3 text-sm sm:text-base">{project.name}</h3>
-            <p className="text-xs sm:text-sm text-gray-500">{venue}</p>
+            <div className="flex gap-1.5 mt-1 flex-wrap">
+              {getEventTypeBadge(project.event_type)}
+              {allZones.length > 0 && (() => {
+                const types = [...new Set(allZones.map(z => z.tipo).filter(Boolean))];
+                return types.map((t, i) => <span key={i}>{getZoneTypeBadge(t)}</span>);
+              })()}
+            </div>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">{venue}</p>
             <p className="text-xs sm:text-sm text-gray-500">{formatDate(dateRange)}</p>
           </div>
 
@@ -524,6 +544,7 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
                     <thead>
                       <tr>
                         <th>Zona</th>
+                        <th className="hidden sm:table-cell">Tipo</th>
                         <th className="text-right">Cap.</th>
                         <th className="text-right">Vend.</th>
                         <th className="text-right hidden sm:table-cell">Disp.</th>
@@ -539,6 +560,7 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
                         return (
                           <tr key={z.id}>
                             <td className="font-medium">{z.nombre}</td>
+                            <td className="hidden sm:table-cell">{getZoneTypeBadge(z.tipo)}</td>
                             <td className="text-right">{z.capacidad}</td>
                             <td className="text-right">{z.vendidos}</td>
                             <td className="text-right hidden sm:table-cell">{avail}</td>
@@ -559,6 +581,7 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
                         return (
                           <tr className="total-row">
                             <td className="font-bold">Total</td>
+                            <td className="hidden sm:table-cell"></td>
                             <td className="text-right">{totalCap}</td>
                             <td className="text-right">{totalVend}</td>
                             <td className="text-right hidden sm:table-cell">{totalAvail}</td>
@@ -574,9 +597,12 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
             )}
 
             {allSchedules.length > 0 && (
-              <div className="section-card">
+              <div className={`section-card ${project.event_type === 'recurring' ? 'ring-1 ring-indigo-200' : ''}`}>
                 <div className="section-card-header">
-                  <h4 className="section-card-title">Funciones</h4>
+                  <h4 className="section-card-title">
+                    Funciones ({allSchedules.length})
+                    {project.event_type === 'recurring' && <span className="ml-2 text-[10px] text-indigo-500 font-normal">El comprador elige fecha</span>}
+                  </h4>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="data-table">
@@ -797,7 +823,7 @@ export default function EventsPage() {
               date: event.start_date ? formatDate(event.start_date) : 'TBD',
               image_url: event.image_url || '',
               ticketsSold, totalTickets, revenue,
-              zones: eventZones.map((z, idx) => ({ id: `zone-${event.id}-${idx}`, nombre: z.zone_name, precio: z.price, capacidad: z.available + z.sold, vendidos: z.sold })),
+              zones: eventZones.map((z, idx) => ({ id: `zone-${event.id}-${idx}`, nombre: z.zone_name, tipo: z.zone_type, precio: z.price, capacidad: z.available + z.sold, vendidos: z.sold })),
               schedules: eventSchedules.map((s) => ({ id: s.id, fecha: s.date, horaInicio: s.start_time, horaFin: s.end_time, activa: s.status === 'active', vendidos: s.sold_capacity })),
               orders: eventOrders.slice(0, 10).map((o) => ({ id: o.order_number, cliente: o.customer_name, email: o.customer_email, zona: o.zone_name, cantidad: o.quantity, total: o.total_price, estado: mapPaymentStatus(o.payment_status), fecha: o.purchased_at })),
               ticketTypes: Array.from(ticketTypeMap.entries()).map(([tName, data], idx) => ({ id: `tt-${idx}`, name: tName, price: data.price, sold: data.sold, available: data.available })).sort((a, b) => b.price - a.price),

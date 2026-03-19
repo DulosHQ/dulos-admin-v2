@@ -71,6 +71,7 @@ export interface SalesSummary {
 export interface TicketZone {
   event_id: string;
   zone_name: string;
+  zone_type?: string; // ga | numbered | hybrid
   price: number;
   original_price: number;
   available: number;
