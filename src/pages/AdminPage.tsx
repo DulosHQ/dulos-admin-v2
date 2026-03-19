@@ -644,40 +644,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* ====== RECINTOS (VENUES) ====== */}
-      <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-extrabold text-sm sm:text-base">Recintos ({venues.length})</h2>
-        </div>
-        {venues.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="data-table text-xs">
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Ciudad</th>
-                  <th className="text-right">Capacidad</th>
-                  <th className="hidden sm:table-cell">Dirección</th>
-                  <th className="hidden sm:table-cell">Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {venues.map(v => (
-                  <tr key={v.id}>
-                    <td className="font-bold">{v.name}</td>
-                    <td>{v.city || '—'}</td>
-                    <td className="text-right">{v.capacity?.toLocaleString() || '—'}</td>
-                    <td className="hidden sm:table-cell text-gray-500 truncate max-w-[200px]">{v.address || '—'}</td>
-                    <td className="hidden sm:table-cell text-gray-500">{v.state || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="text-xs text-gray-400 text-center py-4">Sin recintos registrados</p>
-        )}
-      </div>
+      {/* Recintos moved to Eventos page (Block 3) */}
 
       {/* ====== COMUNICACIONES (Notifications + Reminders + Surveys) ====== */}
       <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
@@ -750,40 +717,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* ====== BLOG ====== */}
-      {blogPosts.length > 0 && (
-        <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-extrabold text-sm sm:text-base">Blog ({blogPosts.length})</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="data-table text-xs">
-              <thead>
-                <tr>
-                  <th>Título</th>
-                  <th>Slug</th>
-                  <th>Estado</th>
-                  <th className="hidden sm:table-cell">Publicado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {blogPosts.map(bp => (
-                  <tr key={bp.id}>
-                    <td className="font-bold">{bp.title}</td>
-                    <td className="text-gray-500 font-mono text-[10px]">{bp.slug}</td>
-                    <td>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${bp.status === 'published' ? 'bg-green-500' : bp.status === 'draft' ? 'bg-yellow-500' : 'bg-gray-400'}`}>
-                        {bp.status === 'published' ? 'Publicado' : bp.status === 'draft' ? 'Borrador' : bp.status}
-                      </span>
-                    </td>
-                    <td className="hidden sm:table-cell text-gray-400">{bp.published_at ? new Date(bp.published_at).toLocaleDateString('es-MX') : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {/* Blog moved to Operaciones page (Block 3) */}
 
       {/* Role Detail Modal (click on a role card) */}
       {showRoleDetail && roleDefinitions[showRoleDetail] && (

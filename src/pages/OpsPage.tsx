@@ -15,6 +15,7 @@ import {
   searchCustomerByNameOrEmail,
   fetchScannerLinks,
   createScannerLink,
+  fetchBlogPosts,
   Checkin,
   Coupon,
   Ticket,
@@ -25,6 +26,7 @@ import {
   Escalation,
   CustomerHistory,
   ScannerLinkFull,
+  BlogPost,
 } from '../lib/supabase'
 import { createCoupon as createCouponAction } from '../app/actions/coupons.actions'
 import { couponSchema } from '../lib/validations/coupons.schema'
@@ -134,6 +136,9 @@ export default function OpsPage() {
   const [scannerForm, setScannerForm] = useState({ event_id: '', label: '' })
   const [scannerSubmitting, setScannerSubmitting] = useState(false)
 
+  // Blog posts (relocated from Config)
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([])
+
   useEffect(() => {
     Promise.all([
       fetchCheckins().catch(() => []),
@@ -144,7 +149,8 @@ export default function OpsPage() {
       fetchTicketRecovery().catch(() => []),
       fetchAllEscalations().catch(() => []),
       fetchScannerLinks().catch(() => []),
-    ]).then(([ci, co, tk, nl, ev, tr, esc, sl]) => {
+      fetchBlogPosts().catch(() => []),
+    ]).then(([ci, co, tk, nl, ev, tr, esc, sl, bp]) => {
       setCheckins(ci.filter((c: Checkin) => c.customer_name && c.customer_name !== 'DUPLICADO'))
       setCupones(co)
       setTickets(tk)
@@ -152,6 +158,7 @@ export default function OpsPage() {
       setEvents(ev)
       setTicketRecovery(tr)
       setEscalations(esc)
+      setBlogPosts(bp || [])
       setLoading(false)
     })
   }, [])
@@ -1159,6 +1166,30 @@ export default function OpsPage() {
                 <div className="py-6 text-center text-gray-400 text-xs">Sin notificaciones</div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ====== BLOG (relocated from Config → Block 3) ====== */}
+      {blogPosts.length > 0 && (
+        <div className="section-card">
+          <div className="section-card-header">
+            <span className="section-card-title">📝 Blog ({blogPosts.length})</span>
+          </div>
+          <div className="section-card-body">
+            <table className="data-table text-xs">
+              <thead><tr><th>Título</th><th>Slug</th><th>Estado</th><th className="hidden sm:table-cell">Publicado</th></tr></thead>
+              <tbody>
+                {blogPosts.map(bp => (
+                  <tr key={bp.id}>
+                    <td className="font-bold">{bp.title}</td>
+                    <td className="text-gray-500 font-mono text-[10px]">{bp.slug}</td>
+                    <td><span className={`badge ${bp.status === 'published' ? 'badge-success' : bp.status === 'draft' ? 'badge-warning' : 'badge-info'}`}>{bp.status === 'published' ? 'Pub' : bp.status === 'draft' ? 'Draft' : bp.status}</span></td>
+                    <td className="hidden sm:table-cell text-gray-400">{bp.published_at ? new Date(bp.published_at).toLocaleDateString('es-MX', {day:'numeric',month:'short'}) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

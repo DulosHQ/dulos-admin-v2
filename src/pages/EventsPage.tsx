@@ -12,6 +12,7 @@ import {
   fetchScheduleInventory,
   fetchVenueSeats,
   fetchEventSectionSeatsForEvent,
+  fetchVenues,
   getVenueMap,
   getVenueName,
   getVenueCity,
@@ -727,6 +728,7 @@ export default function EventsPage() {
   const [projects, setProjects] = useState<ProjectDisplay[]>([]);
   const [events, setEvents] = useState<DulosEvent[]>([]);
   const [venueMap, setVenueMap] = useState<Map<string, Venue>>(new Map());
+  const [allVenues, setAllVenues] = useState<Venue[]>([]);
   const [eventDashboardData, setEventDashboardData] = useState<EventDashboard[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -747,16 +749,18 @@ export default function EventsPage() {
 
   async function loadData() {
     try {
-      const [events, zones, orders, schedules, venues, dashboardData] = await Promise.all([
+      const [events, zones, orders, schedules, venues, dashboardData, venuesList] = await Promise.all([
         fetchAllEvents().catch(() => []),
         fetchZones().catch(() => []),
         fetchAllOrders().catch(() => []),
         fetchSchedules().catch(() => []),
         getVenueMap().catch(() => new Map<string, Venue>()),
         fetchEventDashboard().catch(() => [] as EventDashboard[]),
+        fetchVenues().catch(() => [] as Venue[]),
       ]);
 
       setVenueMap(venues);
+      setAllVenues(venuesList);
       setEvents(events);
       setEventDashboardData(dashboardData);
 
@@ -1122,6 +1126,41 @@ export default function EventsPage() {
           onCancel={() => setArchiveTarget(null)}
         />
       </div>
+
+      {/* ====== RECINTOS (relocated from Config → Block 3) ====== */}
+      {allVenues.length > 0 && (
+        <div className="section-card mt-4">
+          <div className="section-card-header">
+            <span className="section-card-title">🏟️ Recintos ({allVenues.length})</span>
+          </div>
+          <div className="section-card-body">
+            <table className="data-table text-xs">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Ciudad</th>
+                  <th className="text-right">Capacidad</th>
+                  <th className="hidden sm:table-cell">Seatmap</th>
+                  <th className="hidden sm:table-cell">Dirección</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allVenues.map(v => (
+                  <tr key={v.id}>
+                    <td className="font-bold">{v.name}</td>
+                    <td>{v.city || '—'}</td>
+                    <td className="text-right">{v.capacity?.toLocaleString() || '—'}</td>
+                    <td className="hidden sm:table-cell">
+                      {(v as any).has_seatmap ? <span className="badge badge-reserved">Numerado</span> : <span className="badge badge-ga">GA</span>}
+                    </td>
+                    <td className="hidden sm:table-cell text-gray-500 truncate max-w-[200px]">{v.address || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
