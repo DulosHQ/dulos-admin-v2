@@ -13,6 +13,8 @@ import {
   fetchCustomersSearchPaginated,
   fetchCustomerHistory,
   searchCustomerByNameOrEmail,
+  fetchScannerLinks,
+  createScannerLink,
   Checkin,
   Coupon,
   Ticket,
@@ -22,6 +24,7 @@ import {
   TicketRecovery,
   Escalation,
   CustomerHistory,
+  ScannerLinkFull,
 } from '../lib/supabase'
 import { createCoupon as createCouponAction } from '../app/actions/coupons.actions'
 import { couponSchema } from '../lib/validations/coupons.schema'
@@ -125,6 +128,12 @@ export default function OpsPage() {
   const [ticketRecovery, setTicketRecovery] = useState<TicketRecovery[]>([])
   const [escalations, setEscalations] = useState<Escalation[]>([])
 
+  // Scanner links
+  const [scannerLinks, setScannerLinks] = useState<ScannerLinkFull[]>([])
+  const [showCreateScanner, setShowCreateScanner] = useState(false)
+  const [scannerForm, setScannerForm] = useState({ event_id: '', label: '' })
+  const [scannerSubmitting, setScannerSubmitting] = useState(false)
+
   useEffect(() => {
     Promise.all([
       fetchCheckins().catch(() => []),
@@ -134,7 +143,8 @@ export default function OpsPage() {
       fetchAllEvents().catch(() => []),
       fetchTicketRecovery().catch(() => []),
       fetchAllEscalations().catch(() => []),
-    ]).then(([ci, co, tk, nl, ev, tr, esc]) => {
+      fetchScannerLinks().catch(() => []),
+    ]).then(([ci, co, tk, nl, ev, tr, esc, sl]) => {
       setCheckins(ci.filter((c: Checkin) => c.customer_name && c.customer_name !== 'DUPLICADO'))
       setCupones(co)
       setTickets(tk)
@@ -348,7 +358,7 @@ export default function OpsPage() {
       {/* Sub-tabs Navigation */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="flex border-b border-gray-200">
-          {['checkins', 'clientes', 'cupones', 'recovery', 'escalaciones'].map((tab) => (
+          {['checkins', 'clientes', 'scanner', 'cupones', 'recovery', 'escalaciones'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -360,6 +370,7 @@ export default function OpsPage() {
             >
               {tab === 'checkins' ? 'Check-ins' :
                tab === 'clientes' ? `Clientes (${customerTotal.toLocaleString()})` :
+               tab === 'scanner' ? `Scanner (${scannerLinks.length})` :
                tab === 'cupones' ? 'Cupones' :
                tab === 'recovery' ? `Recovery (${ticketRecovery.length})` :
                `Escalaciones (${escalations.length})`}
@@ -736,38 +747,41 @@ export default function OpsPage() {
                               <div className="w-5 h-5 border-2 border-[#EF4444] border-t-transparent rounded-full animate-spin" />
                             </div>
                           ) : customerHistory.length > 0 ? (
-                            <div className="space-y-1.5">
-                              {customerHistory.map((h: any, idx: number) => (
-                                <div key={idx} className="bg-white rounded-lg p-2.5 text-xs border border-gray-100">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-mono text-[#EF4444] font-bold text-[11px]">{h.order_number}</span>
-                                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${
-                                        h.payment_status === 'completed' ? 'bg-green-500' :
-                                        h.payment_status === 'refunded' ? 'bg-red-500' : 'bg-yellow-500'
-                                      }`}>
-                                        {h.payment_status === 'completed' ? 'Pagado' : h.payment_status === 'refunded' ? 'Reembolsado' : h.payment_status}
-                                      </span>
-                                    </div>
-                                    <span className="font-black text-[#1E293B]">${(h.total_price || 0).toLocaleString()}</span>
-                                  </div>
-                                  <div className="flex items-center gap-1.5 text-gray-500">
-                                    <span className="font-bold text-gray-700">{h.event_name}</span>
-                                    <span>·</span>
-                                    <span>{h.venue_name}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 mt-1 text-gray-400">
-                                    <span>{h.zone_name} × {h.quantity}</span>
-                                    {h.event_date && <span>· {new Date(h.event_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}</span>}
-                                    {h.ticket_used && <span className="text-blue-500 font-bold">✓ Usado</span>}
-                                  </div>
-                                </div>
-                              ))}
+                            <div>
                               {customerHistory[0]?.is_vip && (
-                                <div className="flex items-center gap-1 mt-1">
-                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">⭐ VIP</span>
-                                </div>
+                                <span className="inline-block mb-2 text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">⭐ VIP — {customerHistory[0]?.total_purchases} compras · ${(customerHistory[0]?.total_spent || 0).toLocaleString()}</span>
                               )}
+                              <table className="data-table text-xs w-full">
+                                <thead>
+                                  <tr>
+                                    <th>Orden</th>
+                                    <th>Evento</th>
+                                    <th className="hidden sm:table-cell">Zona</th>
+                                    <th className="text-right">Cant</th>
+                                    <th className="text-right">Total</th>
+                                    <th>Estado</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {customerHistory.map((h: CustomerHistory, idx: number) => (
+                                    <tr key={idx}>
+                                      <td className="font-mono text-[#EF4444] font-bold text-[11px]">{h.order_number}</td>
+                                      <td className="truncate max-w-[120px]">{h.event_name}</td>
+                                      <td className="hidden sm:table-cell">{h.zone_name}</td>
+                                      <td className="text-right">{h.quantity}</td>
+                                      <td className="text-right font-bold">${(h.total_price || 0).toLocaleString()}</td>
+                                      <td>
+                                        <div className="flex items-center gap-1">
+                                          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${h.payment_status === 'completed' ? 'bg-green-500' : h.payment_status === 'refunded' ? 'bg-red-500' : 'bg-yellow-500'}`}>
+                                            {h.payment_status === 'completed' ? 'Pagado' : h.payment_status === 'refunded' ? 'Reemb.' : h.payment_status}
+                                          </span>
+                                          {h.ticket_used && <span className="text-blue-500 font-bold text-[10px]">✓</span>}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
                           ) : (
                             <p className="text-xs text-gray-400 text-center py-2">Sin historial de compras</p>
@@ -807,6 +821,56 @@ export default function OpsPage() {
               {customerSearch && searchResults.length === 0 && (
                 <p className="text-center text-gray-500 text-sm py-4">No se encontraron clientes</p>
               )}
+            </div>
+          )}
+
+          {/* Scanner Links Tab */}
+          {activeTab === 'scanner' && (
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <h2 className="text-sm font-extrabold text-[#1E293B]">Scanner Links</h2>
+                <button onClick={() => setShowCreateScanner(!showCreateScanner)} className="px-3 py-1.5 text-white rounded text-xs font-bold hover:opacity-90 bg-[#EF4444]">+ Crear Link</button>
+              </div>
+              {showCreateScanner && (
+                <div className="section-card p-3">
+                  <div className="flex gap-2 flex-wrap">
+                    <select value={scannerForm.event_id} onChange={e => setScannerForm({...scannerForm, event_id: e.target.value})} className="flex-1 min-w-[120px] px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#EF4444]">
+                      <option value="">Seleccionar evento...</option>
+                      {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+                    </select>
+                    <input type="text" value={scannerForm.label} onChange={e => setScannerForm({...scannerForm, label: e.target.value})} placeholder="Etiqueta (ej: Puerta 1)" className="flex-1 min-w-[120px] px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#EF4444]" />
+                    <button onClick={async () => {
+                      if (!scannerForm.event_id || !scannerForm.label) { toast.error('Completa evento y etiqueta'); return }
+                      setScannerSubmitting(true)
+                      const result = await createScannerLink({ event_id: scannerForm.event_id, label: scannerForm.label })
+                      if (result) { setScannerLinks(prev => [result, ...prev]); setScannerForm({ event_id: '', label: '' }); setShowCreateScanner(false); toast.success('Scanner link creado') }
+                      else { toast.error('Error al crear scanner link') }
+                      setScannerSubmitting(false)
+                    }} disabled={scannerSubmitting} className="px-3 py-1.5 bg-[#EF4444] text-white rounded text-xs font-bold disabled:opacity-40">{scannerSubmitting ? '...' : 'Crear'}</button>
+                    <button onClick={() => setShowCreateScanner(false)} className="px-2 py-1.5 text-xs text-gray-500">✕</button>
+                  </div>
+                </div>
+              )}
+              <div className="overflow-x-auto">
+                <table className="data-table text-xs">
+                  <thead><tr><th>Label</th><th>Evento</th><th className="text-right">Scans</th><th>Activo</th><th className="hidden sm:table-cell">Válido Desde</th><th className="hidden sm:table-cell">Válido Hasta</th></tr></thead>
+                  <tbody>
+                    {scannerLinks.length > 0 ? scannerLinks.map(sl => {
+                      const ev = events.find(e => e.id === sl.event_id)
+                      return (
+                        <tr key={sl.id}>
+                          <td className="font-bold">{sl.label || (sl.token ? sl.token.substring(0, 8) : '—')}</td>
+                          <td className="truncate max-w-[150px]">{ev?.name || (sl.event_id ? sl.event_id.substring(0, 8) : '—')}</td>
+                          <td className="text-right font-bold">{sl.scans_count || 0}</td>
+                          <td><span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${sl.is_active ? 'bg-green-500' : 'bg-gray-400'}`}>{sl.is_active ? 'Activo' : 'Inactivo'}</span></td>
+                          <td className="hidden sm:table-cell text-gray-500">{sl.valid_from ? new Date(sl.valid_from).toLocaleDateString('es-MX') : '—'}</td>
+                          <td className="hidden sm:table-cell text-gray-500">{sl.valid_until ? new Date(sl.valid_until).toLocaleDateString('es-MX') : '—'}</td>
+                        </tr>
+                      )
+                    }) : (<tr><td colSpan={6} className="text-center py-6 text-gray-400">No hay scanner links</td></tr>)}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 

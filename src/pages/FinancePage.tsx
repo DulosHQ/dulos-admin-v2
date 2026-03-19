@@ -18,6 +18,7 @@ import {
   fetchSalesSummary,
   fetchTransactionsPaginated,
   fetchEventSections,
+  fetchDispersions,
   DulosEvent,
   TicketZone,
   Ticket,
@@ -25,6 +26,7 @@ import {
   Schedule,
   SalesSummary,
   EventSection,
+  DispersionFull,
 } from '../lib/supabase';
 
 type TabKey = 'ingresos' | 'tendencias' | 'transacciones' | 'comisiones';
@@ -144,6 +146,7 @@ export default function FinancePage() {
   const [salesSummary, setSalesSummary] = useState<SalesSummary[]>([]);
   const [rawOrders, setRawOrders] = useState<Order[]>([]);
   const [pedidosData] = useState<{ headers: string[]; rows: any[]; totalRows: number }>({ headers: [], rows: [], totalRows: 0 });
+  const [dispersions, setDispersions] = useState<DispersionFull[]>([]);
 
   // UI state
   const [expandedCapacity, setExpandedCapacity] = useState<number | null>(null);
@@ -164,7 +167,7 @@ export default function FinancePage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [zones, ordersData, schedulesData, eventsData, tickets, revenueByEvent, salesSummaryData] = await Promise.all([
+        const [zones, ordersData, schedulesData, eventsData, tickets, revenueByEvent, salesSummaryData, dispersionsData] = await Promise.all([
           fetchZones().catch(() => [] as TicketZone[]),
           fetchAllOrders().catch(() => []),
           fetchSchedules().catch(() => [] as Schedule[]),
@@ -172,6 +175,7 @@ export default function FinancePage() {
           fetchTickets().catch(() => [] as Ticket[]),
           fetchRevenueByEvent().catch(() => []),
           fetchSalesSummary().catch(() => [] as SalesSummary[]),
+          fetchDispersions().catch(() => [] as DispersionFull[]),
         ]);
         setRawZones(zones);
         setRawTickets(tickets);
@@ -180,6 +184,7 @@ export default function FinancePage() {
         setRawEventRevenues(revenueByEvent);
         setSalesSummary(salesSummaryData);
         setRawOrders(ordersData);
+        setDispersions(dispersionsData);
       } catch (error) {
         console.error('Error loading finance data:', error);
       } finally {
@@ -446,9 +451,11 @@ export default function FinancePage() {
 
     const summaryStats = { bestDay, avgTicketPrice, popularEvent, popularZone };
 
-    // --- UTM / Marketing data from orders ---
+    // --- UTM / Marketing / Geo data from orders ---
     const utmSourceMap = new Map<string, { count: number; revenue: number }>();
     const deviceMap = new Map<string, number>();
+    const cityMap = new Map<string, { count: number; revenue: number }>();
+    const browserMap = new Map<string, number>();
     const filteredOrders = selectedEvent ? rawOrders.filter(o => o.event_id === selectedEvent) : rawOrders;
     filteredOrders.forEach(o => {
       const source = o.utm_source || 'Directo';
@@ -459,6 +466,17 @@ export default function FinancePage() {
 
       const device = o.device_type || 'Desconocido';
       deviceMap.set(device, (deviceMap.get(device) || 0) + 1);
+
+      // Geo
+      const city = o.city || 'Desconocida';
+      const cityData = cityMap.get(city) || { count: 0, revenue: 0 };
+      cityData.count++;
+      cityData.revenue += o.total_price || 0;
+      cityMap.set(city, cityData);
+
+      // Browser
+      const browser = o.browser || 'Desconocido';
+      browserMap.set(browser, (browserMap.get(browser) || 0) + 1);
     });
     const utmSources = Array.from(utmSourceMap.entries())
       .map(([source, data]) => ({ source, ...data }))
@@ -467,25 +485,52 @@ export default function FinancePage() {
     const deviceBreakdown = Array.from(deviceMap.entries())
       .map(([device, count]) => ({ device, count }))
       .sort((a, b) => b.count - a.count);
+    const cityBreakdown = Array.from(cityMap.entries())
+      .map(([city, data]) => ({ city, ...data }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+    const browserBreakdown = Array.from(browserMap.entries())
+      .map(([browser, count]) => ({ browser, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
 
-    // --- Commission calculations (15% for Dulos, 85% for producers) ---
+    // --- Commission calculations — real dispersions if available, fallback 15% ---
+    const hasRealDispersions = dispersions.length > 0;
     const totalComissionRevenue = filteredSalesSummary.reduce((sum, s) => sum + s.total_revenue, 0);
-    const dulosCommission = totalComissionRevenue * 0.15;
-    const producerShare = totalComissionRevenue * 0.85;
+
+    let dulosCommission: number;
+    let producerShare: number;
+    let realDispersions: DispersionFull[] = [];
+
+    if (hasRealDispersions) {
+      const filteredDisp = selectedEvent ? dispersions.filter(d => d.event_id === selectedEvent) : dispersions;
+      realDispersions = filteredDisp;
+      dulosCommission = filteredDisp.reduce((s, d) => s + d.platform_fee, 0);
+      producerShare = filteredDisp.reduce((s, d) => s + d.net_payout, 0);
+    } else {
+      dulosCommission = totalComissionRevenue * 0.15;
+      producerShare = totalComissionRevenue * 0.85;
+    }
 
     const commissionData = {
       totalRevenue: totalComissionRevenue,
       dulosCommission,
       producerShare,
-      events: Array.from(eventAggMap.values()).map(e => ({
-        event_id: e.event_ids[0],
-        event_name: e.event_name,
-        revenue: e.revenue,
-        commission: e.revenue * 0.15,
-        producer: e.revenue * 0.85,
-        tickets: e.tickets,
-        image_url: e.image_url,
-      })).sort((a, b) => b.revenue - a.revenue)
+      hasRealDispersions,
+      realDispersions,
+      events: Array.from(eventAggMap.values()).map(e => {
+        const disp = dispersions.find(d => d.event_id === e.event_ids[0]);
+        return {
+          event_id: e.event_ids[0],
+          event_name: e.event_name,
+          revenue: e.revenue,
+          commission: disp ? disp.platform_fee : e.revenue * 0.15,
+          producer: disp ? disp.net_payout : e.revenue * 0.85,
+          tickets: e.tickets,
+          image_url: e.image_url,
+          dispersion: disp || null,
+        };
+      }).sort((a, b) => b.revenue - a.revenue)
     };
 
     // --- Transactions from pedidos data (REAL DATA) ---
@@ -541,8 +586,10 @@ export default function FinancePage() {
       commissionData,
       utmSources,
       deviceBreakdown,
+      cityBreakdown,
+      browserBreakdown,
     };
-  }, [loading, events, rawZones, rawTickets, rawSchedules, rawEventRevenues, salesSummary, rawOrders, pedidosData, selectedEvent, dateRange]);
+  }, [loading, events, rawZones, rawTickets, rawSchedules, rawEventRevenues, salesSummary, rawOrders, pedidosData, selectedEvent, dateRange, dispersions]);
 
   // Handle revenue event drill-down
   const handleRevenueEventClick = async (eventId: string, eventIds?: string[]) => {
@@ -712,7 +759,7 @@ export default function FinancePage() {
 
   if (!computed) return null;
 
-  const { scorecardData, eventRevenues, zoneRevenues, donutData, donutTotal, dailyRevenueData, schedulesDisplay, zonesByEvent, capacityStats, dayOfWeekData, eventOccupancy, summaryStats, commissionData, utmSources, deviceBreakdown } = computed;
+  const { scorecardData, eventRevenues, zoneRevenues, donutData, donutTotal, dailyRevenueData, schedulesDisplay, zonesByEvent, capacityStats, dayOfWeekData, eventOccupancy, summaryStats, commissionData, utmSources, deviceBreakdown, cityBreakdown, browserBreakdown } = computed;
 
   return (
     <div className="space-y-4">
@@ -1102,7 +1149,60 @@ export default function FinancePage() {
             </div>
           </div>
 
-          {/* Ventas por Día de la Semana — chart below traffic */}
+          {/* Geographic breakdown — compact */}
+          {(() => {
+            const geoFilteredOrders = selectedEvent ? rawOrders.filter(o => o.event_id === selectedEvent) : rawOrders;
+            const geoMap = new Map<string, { count: number; revenue: number }>();
+            geoFilteredOrders.forEach(o => {
+              const key = `${o.city || 'Desconocido'}, ${o.country || '??'}`;
+              const existing = geoMap.get(key) || { count: 0, revenue: 0 };
+              existing.count++;
+              existing.revenue += o.total_price || 0;
+              geoMap.set(key, existing);
+            });
+            const geoData = Array.from(geoMap.entries()).map(([loc, d]) => ({ loc, ...d })).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+            if (geoData.length === 0) return null;
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="section-card">
+                  <div className="section-card-header">
+                    <span className="section-card-title">Geografía</span>
+                    <span className="ml-auto text-xs text-gray-400">{geoData.length} ubicaciones</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="data-table text-xs">
+                      <thead><tr><th>Ciudad, País</th><th className="text-right">Órdenes</th><th className="text-right">Revenue</th></tr></thead>
+                      <tbody>
+                        {geoData.map((g, i) => (
+                          <tr key={i}><td className="font-bold">{g.loc}</td><td className="text-right">{g.count}</td><td className="text-right font-bold">{fmtCurrency(g.revenue)}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="section-card">
+                  <div className="section-card-header">
+                    <span className="section-card-title">Dispositivos</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="data-table text-xs">
+                      <thead><tr><th>Dispositivo</th><th className="text-right">Órdenes</th><th className="text-right">%</th></tr></thead>
+                      <tbody>
+                        {deviceBreakdown.length > 0 ? deviceBreakdown.map((d, i) => {
+                          const totalDev = deviceBreakdown.reduce((s, x) => s + x.count, 0);
+                          return (
+                            <tr key={i}><td className="font-bold capitalize">{d.device}</td><td className="text-right">{d.count}</td><td className="text-right text-gray-500">{totalDev > 0 ? Math.round((d.count / totalDev) * 100) : 0}%</td></tr>
+                          );
+                        }) : <tr><td colSpan={3} className="text-center py-3 text-gray-400">Sin datos</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+                    {/* Ventas por Día de la Semana — chart below traffic */}
           <div className="section-card">
             <div className="section-card-header">
               <span className="section-card-title">Ventas por Día de la Semana</span>
@@ -1120,6 +1220,8 @@ export default function FinancePage() {
               </div>
             </div>
           </div>
+
+          {/* geo/device tables handled by IIFE above */}
         </div>
       )}
 
@@ -1277,130 +1379,138 @@ export default function FinancePage() {
       {/* ====== COMISIONES TAB ====== */}
       {activeTab === 'comisiones' && (
         <div className="space-y-4 animate-fade-in">
-          {/* Summary row — compact */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
-              <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase">Ingresos brutos</p>
-              <p className="text-sm sm:text-lg font-extrabold">{fmtCurrency(commissionData.totalRevenue)}</p>
-            </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
-              <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase">Comisión (15%)</p>
-              <p className="text-sm sm:text-lg font-extrabold text-[#EF4444]">{fmtCurrency(commissionData.dulosCommission)}</p>
-            </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
-              <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase">Productor (85%)</p>
-              <p className="text-sm sm:text-lg font-extrabold text-emerald-600">{fmtCurrency(commissionData.producerShare)}</p>
-            </div>
-          </div>
-
-          {/* Visual split bar */}
-          <div className="section-card">
-            <div className="section-card-header">
-              <span className="section-card-title">Distribución</span>
-            </div>
-            <div className="px-4 pb-4">
-              <div className="h-6 rounded-full overflow-hidden flex">
-                <div className="bg-[#EF4444] flex items-center justify-center" style={{ width: '15%' }}>
-                  <span className="text-[9px] font-bold text-white">15%</span>
+          {dispersions.length > 0 ? (() => {
+            const filtDisp = selectedEvent ? dispersions.filter(d => d.event_id === selectedEvent) : dispersions;
+            const totGross = filtDisp.reduce((s, d) => s + (d.gross_revenue || 0), 0);
+            const totFee = filtDisp.reduce((s, d) => s + (d.platform_fee || 0), 0);
+            const totPayout = filtDisp.reduce((s, d) => s + (d.net_payout || 0), 0);
+            const totRefunds = filtDisp.reduce((s, d) => s + (d.refunds || 0), 0);
+            const totAdSpend = filtDisp.reduce((s, d) => s + (d.ad_spend || 0), 0);
+            return (<>
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                <div className="bg-white rounded-lg border border-gray-200 p-2 text-center">
+                  <p className="text-[9px] text-gray-500 uppercase">Bruto</p>
+                  <p className="text-sm font-extrabold">{fmtCurrency(totGross)}</p>
                 </div>
-                <div className="bg-emerald-500 flex items-center justify-center" style={{ width: '85%' }}>
-                  <span className="text-[9px] font-bold text-white">85% Productor</span>
+                <div className="bg-white rounded-lg border border-gray-200 p-2 text-center">
+                  <p className="text-[9px] text-gray-500 uppercase">ComisiÃ³n</p>
+                  <p className="text-sm font-extrabold text-[#EF4444]">{fmtCurrency(totFee)}</p>
+                </div>
+                <div className="bg-white rounded-lg border border-gray-200 p-2 text-center">
+                  <p className="text-[9px] text-gray-500 uppercase">Payout</p>
+                  <p className="text-sm font-extrabold text-emerald-600">{fmtCurrency(totPayout)}</p>
+                </div>
+                <div className="bg-white rounded-lg border border-gray-200 p-2 text-center hidden sm:block">
+                  <p className="text-[9px] text-gray-500 uppercase">Reembolsos</p>
+                  <p className="text-sm font-extrabold text-orange-500">{fmtCurrency(totRefunds)}</p>
+                </div>
+                <div className="bg-white rounded-lg border border-gray-200 p-2 text-center hidden sm:block">
+                  <p className="text-[9px] text-gray-500 uppercase">Ad Spend</p>
+                  <p className="text-sm font-extrabold text-blue-500">{fmtCurrency(totAdSpend)}</p>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Commission Breakdown Table with drill-down */}
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Evento</th>
-                  <th className="text-right">Boletos</th>
-                  <th className="text-right">Ingresos</th>
-                  <th className="text-right">Comisión (15%)</th>
-                  <th className="text-right">Productor (85%)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {commissionData.events.length > 0 ? commissionData.events.map(event => {
-                  const isExpComm = expandedRevenueEvent === `comm-${event.event_id}`;
-                  const eventZones = rawZones.filter(z => z.event_id === event.event_id);
-                  return (
-                  <React.Fragment key={event.event_id}>
-                  <tr
-                    onClick={() => setExpandedRevenueEvent(isExpComm ? null : `comm-${event.event_id}`)}
-                    className={`cursor-pointer ${isExpComm ? 'bg-red-50' : ''}`}
-                  >
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <svg className={`w-3 h-3 text-gray-400 transition-transform flex-shrink-0 ${isExpComm ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                        {event.image_url && (
-                          <img src={event.image_url} alt={event.event_name} className="w-6 h-6 rounded object-cover flex-shrink-0" />
-                        )}
-                        <span className="font-bold">{event.event_name}</span>
-                      </div>
-                    </td>
-                    <td className="text-right">{event.tickets.toLocaleString()}</td>
-                    <td className="text-right font-bold">{fmtCurrency(event.revenue)}</td>
-                    <td className="text-right font-bold text-[#EF4444]">{fmtCurrency(event.commission)}</td>
-                    <td className="text-right font-bold text-emerald-600">{fmtCurrency(event.producer)}</td>
-                  </tr>
-                  {isExpComm && (
+              <div className="section-card">
+                <div className="section-card-header">
+                  <span className="section-card-title">Dispersiones</span>
+                  <span className="ml-auto text-xs text-gray-400">{filtDisp.length} registros</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="data-table text-xs">
+                    <thead>
+                      <tr>
+                        <th>Periodo</th>
+                        <th className="text-right">Bruto</th>
+                        <th className="text-right hidden sm:table-cell">Descuentos</th>
+                        <th className="text-right hidden sm:table-cell">Reembolsos</th>
+                        <th className="text-right">ComisiÃ³n</th>
+                        <th className="text-right">Net Payout</th>
+                        <th>Estado</th>
+                        <th className="hidden sm:table-cell">Ref. Pago</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtDisp.map(d => (
+                        <tr key={d.id}>
+                          <td className="whitespace-nowrap">
+                            {d.period_start ? new Date(d.period_start).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : '—'}
+                            {' – '}
+                            {d.period_end ? new Date(d.period_end).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : '—'}
+                          </td>
+                          <td className="text-right font-bold">{fmtCurrency(d.gross_revenue || 0)}</td>
+                          <td className="text-right hidden sm:table-cell">{fmtCurrency(d.discounts || 0)}</td>
+                          <td className="text-right hidden sm:table-cell">{fmtCurrency(d.refunds || 0)}</td>
+                          <td className="text-right font-bold text-[#EF4444]">{fmtCurrency(d.platform_fee || 0)}</td>
+                          <td className="text-right font-bold text-emerald-600">{fmtCurrency(d.net_payout || 0)}</td>
+                          <td>
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${d.status === 'paid' ? 'bg-green-500' : d.status === 'cancelled' ? 'bg-red-500' : 'bg-yellow-500'}`}>
+                              {d.status === 'paid' ? 'Pagado' : d.status === 'cancelled' ? 'Cancelado' : 'Pendiente'}
+                            </span>
+                          </td>
+                          <td className="hidden sm:table-cell text-gray-400 truncate max-w-[100px]">{d.payment_reference || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>);
+          })() : (
+            <>
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
+                  <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase">Ingresos brutos</p>
+                  <p className="text-sm sm:text-lg font-extrabold">{fmtCurrency(commissionData.totalRevenue)}</p>
+                </div>
+                <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
+                  <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase">Comisión (15%)</p>
+                  <p className="text-sm sm:text-lg font-extrabold text-[#EF4444]">{fmtCurrency(commissionData.dulosCommission)}</p>
+                </div>
+                <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
+                  <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase">Productor (85%)</p>
+                  <p className="text-sm sm:text-lg font-extrabold text-emerald-600">{fmtCurrency(commissionData.producerShare)}</p>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
                     <tr>
-                      <td colSpan={5} className="bg-gray-50 p-4">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Desglose por Zona</p>
-                        {eventZones.length > 0 ? (
-                          <table className="w-full text-xs">
-                            <thead className="bg-[#1a1a2e] text-white">
-                              <tr>
-                                <th className="px-3 py-2 text-left text-xs font-bold">Zona</th>
-                                <th className="px-3 py-2 text-right text-xs font-bold">Precio</th>
-                                <th className="px-3 py-2 text-right text-xs font-bold">Vendidos</th>
-                                <th className="px-3 py-2 text-right text-xs font-bold">Revenue</th>
-                                <th className="px-3 py-2 text-right text-xs font-bold">Comisión</th>
-                                <th className="px-3 py-2 text-right text-xs font-bold">Productor</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {eventZones.map((z, zi) => {
-                                const zRev = z.sold * z.price;
-                                return (
-                                  <tr key={zi} className="border-b border-gray-100 hover:bg-gray-50">
-                                    <td className="px-3 py-2 font-bold">{z.zone_name}</td>
-                                    <td className="px-3 py-2 text-right">{fmtCurrency(z.price)}</td>
-                                    <td className="px-3 py-2 text-right">{z.sold}</td>
-                                    <td className="px-3 py-2 text-right font-bold">{fmtCurrency(zRev)}</td>
-                                    <td className="px-3 py-2 text-right font-bold text-[#EF4444]">{fmtCurrency(zRev * 0.15)}</td>
-                                    <td className="px-3 py-2 text-right font-bold text-emerald-600">{fmtCurrency(zRev * 0.85)}</td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        ) : (
-                          <p className="text-xs text-gray-400">Sin datos de zonas</p>
-                        )}
-                      </td>
+                      <th>Evento</th>
+                      <th className="text-right">Boletos</th>
+                      <th className="text-right">Ingresos</th>
+                      <th className="text-right">Comisión (15%)</th>
+                      <th className="text-right">Productor (85%)</th>
                     </tr>
-                  )}
-                  </React.Fragment>
-                  );
-                }) : (
-                  <tr><td colSpan={5} className="text-center py-6 text-gray-400">No hay datos de comisiones</td></tr>
-                )}
-                {commissionData.events.length > 1 && (
-                  <tr className="total-row">
-                    <td className="font-bold">Total</td>
-                    <td className="text-right">{commissionData.events.reduce((s, e) => s + e.tickets, 0).toLocaleString()}</td>
-                    <td className="text-right font-bold">{fmtCurrency(commissionData.totalRevenue)}</td>
-                    <td className="text-right font-bold">{fmtCurrency(commissionData.dulosCommission)}</td>
-                    <td className="text-right font-bold">{fmtCurrency(commissionData.producerShare)}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {commissionData.events.map(event => (
+                      <tr key={event.event_id}>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            {event.image_url && <img src={event.image_url} alt={event.event_name} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
+                            <span className="font-bold">{event.event_name}</span>
+                          </div>
+                        </td>
+                        <td className="text-right">{event.tickets.toLocaleString()}</td>
+                        <td className="text-right font-bold">{fmtCurrency(event.revenue)}</td>
+                        <td className="text-right font-bold text-[#EF4444]">{fmtCurrency(event.commission)}</td>
+                        <td className="text-right font-bold text-emerald-600">{fmtCurrency(event.producer)}</td>
+                      </tr>
+                    ))}
+                    {commissionData.events.length > 1 && (
+                      <tr className="total-row">
+                        <td className="font-bold">Total</td>
+                        <td className="text-right">{commissionData.events.reduce((s, e) => s + e.tickets, 0).toLocaleString()}</td>
+                        <td className="text-right font-bold">{fmtCurrency(commissionData.totalRevenue)}</td>
+                        <td className="text-right font-bold">{fmtCurrency(commissionData.dulosCommission)}</td>
+                        <td className="text-right font-bold">{fmtCurrency(commissionData.producerShare)}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[10px] text-gray-400 text-center">⚠️ Cálculo estimado (15%). Las dispersiones reales aparecerán cuando se registren.</p>
+            </>
+          )}
         </div>
       )}
     </div>

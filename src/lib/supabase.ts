@@ -828,7 +828,7 @@ export async function fetchEventSectionSeatsForEvent(eventId: string): Promise<(
 
 // ─── Dispersions (Paolo's payout table) ───
 
-export interface Dispersion {
+export interface DispersionFull {
   id: string;
   event_id: string;
   period_start: string;
@@ -842,14 +842,74 @@ export interface Dispersion {
   carried_over: number;
   net_payout: number;
   status: string;
+  paid_at: string | null;
+  payment_reference: string | null;
+  notes: string | null;
   created_at: string;
 }
 
-export async function fetchDispersions(): Promise<Dispersion[]> {
+export async function fetchDispersions(eventId?: string): Promise<DispersionFull[]> {
   try {
-    return await supabaseFetch<Dispersion[]>('dispersions?order=created_at.desc');
-  } catch (error) {
-    // silent fail
+    const filter = eventId ? `&event_id=eq.${eventId}` : '';
+    return await supabaseFetch<DispersionFull[]>(`dispersions?order=created_at.desc${filter}`);
+  } catch {
+    return [];
+  }
+}
+
+// ─── Scanner Links ───
+
+export interface ScannerLinkFull {
+  id: string;
+  event_id: string;
+  schedule_id: string | null;
+  token: string;
+  label: string;
+  scans_count: number;
+  is_active: boolean;
+  valid_from: string | null;
+  valid_until: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export async function fetchScannerLinks(eventId?: string): Promise<ScannerLinkFull[]> {
+  try {
+    const filter = eventId ? `&event_id=eq.${eventId}` : '';
+    return await supabaseFetch<ScannerLinkFull[]>(`scanner_links?order=created_at.desc${filter}`);
+  } catch {
+    return [];
+  }
+}
+
+export async function createScannerLink(data: { event_id: string; label: string; schedule_id?: string }): Promise<ScannerLinkFull | null> {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/scanner_links`, {
+      method: 'POST',
+      headers: { ...headers, 'Prefer': 'return=representation' },
+      body: JSON.stringify({
+        event_id: data.event_id,
+        label: data.label,
+        schedule_id: data.schedule_id || null,
+        token: crypto.randomUUID(),
+        is_active: true,
+        scans_count: 0,
+      }),
+    });
+    if (!response.ok) return null;
+    const result = await response.json();
+    return Array.isArray(result) ? result[0] : result;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Pending Guests ───
+
+export async function fetchPendingGuests(): Promise<any[]> {
+  try {
+    return await supabaseFetch<any[]>('tickets?status=eq.pending&order=created_at.desc&limit=50');
+  } catch {
     return [];
   }
 }
