@@ -532,6 +532,25 @@ export async function fetchAllOrders(): Promise<Order[]> {
   }
 }
 
+// Lightweight fetches for SummaryPage — only recent + essential columns
+export async function fetchRecentOrders(limit = 50): Promise<Order[]> {
+  try {
+    return await supabaseFetch<Order[]>(`orders?select=id,order_number,customer_name,customer_email,total_price,payment_status,purchased_at,event_id,quantity,zone_name&order=purchased_at.desc&limit=${limit}`);
+  } catch (error) {
+    console.error('Error fetching recent orders:', error);
+    return [];
+  }
+}
+
+export async function fetchRecentTickets(limit = 50): Promise<Ticket[]> {
+  try {
+    return await supabaseFetch<Ticket[]>(`tickets?select=id,ticket_number,event_id,zone_name,customer_name,customer_email,status,price,created_at,checked_in_at&order=created_at.desc&limit=${limit}`);
+  } catch (error) {
+    console.error('Error fetching recent tickets:', error);
+    return [];
+  }
+}
+
 export async function fetchDashboardStats(): Promise<DashboardStats> {
   try {
     const [events, salesSummary, zones] = await Promise.all([
