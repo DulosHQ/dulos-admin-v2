@@ -879,13 +879,13 @@ export default function OpsPage() {
                   <h3 className="text-sm font-extrabold text-[#1E293B] mb-2">Recuperación de Boletos ({ticketRecovery.length})</h3>
                   <div className="overflow-x-auto">
                     <table className="data-table text-xs">
-                      <thead><tr><th>Cliente</th><th>Evento</th><th>Canal</th><th>Fecha</th><th>Estado</th></tr></thead>
+                      <thead><tr><th>Cliente</th><th>Evento</th><th className="hidden sm:table-cell">Canal</th><th>Fecha</th><th>Estado</th></tr></thead>
                       <tbody>
                         {ticketRecovery.map(tr => (
                           <tr key={tr.id}>
-                            <td><span className="font-bold">{tr.customer_name || 'Sin nombre'}</span> <span className="text-gray-400">{tr.customer_email || ''}</span></td>
+                            <td><span className="font-bold">{tr.customer_name || 'Sin nombre'}</span> <span className="text-gray-400 hidden sm:inline">{tr.customer_email || ''}</span></td>
                             <td className="font-bold">{tr.event_name || '—'}</td>
-                            <td>{tr.channel || '—'}</td>
+                            <td className="hidden sm:table-cell">{tr.channel || '—'}</td>
                             <td className="whitespace-nowrap">{new Date(tr.created_at).toLocaleDateString('es-MX', {day:'numeric',month:'short'})}</td>
                             <td><span className={`badge ${tr.status === 'completed' ? 'badge-success' : tr.status === 'sent' ? 'badge-info' : 'badge-warning'}`}>{tr.status === 'completed' ? 'OK' : tr.status === 'sent' ? 'Enviado' : 'Pendiente'}</span></td>
                           </tr>
@@ -1012,13 +1012,13 @@ export default function OpsPage() {
                 {escalations.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="data-table text-xs">
-                      <thead><tr><th>Razón</th><th>Evento</th><th>Descripción</th><th>Fecha</th><th>Estado</th></tr></thead>
+                      <thead><tr><th>Razón</th><th>Evento</th><th className="hidden sm:table-cell">Descripción</th><th>Fecha</th><th>Estado</th></tr></thead>
                       <tbody>
                         {escalations.map(esc => (
                           <tr key={esc.id}>
                             <td className="font-bold">{esc.reason || '—'}</td>
                             <td>{esc.event_mentioned || '—'}</td>
-                            <td className="max-w-[200px] truncate">{esc.description || esc.situation || '—'}</td>
+                            <td className="hidden sm:table-cell max-w-[200px] truncate">{esc.description || esc.situation || '—'}</td>
                             <td className="whitespace-nowrap">{new Date(esc.created_at).toLocaleDateString('es-MX', {day:'numeric',month:'short'})}</td>
                             <td><span className={`badge ${esc.resolved ? 'badge-success' : 'badge-error'}`}>{esc.resolved ? 'Resuelto' : 'Pendiente'}</span></td>
                           </tr>
@@ -1176,7 +1176,7 @@ export default function OpsPage() {
           <div className="section-card-header">
             <span className="section-card-title">📝 Blog ({blogPosts.length})</span>
           </div>
-          <div className="section-card-body">
+          <div className="section-card-body overflow-x-auto">
             <table className="data-table text-xs">
               <thead><tr><th>Título</th><th>Slug</th><th>Estado</th><th className="hidden sm:table-cell">Publicado</th></tr></thead>
               <tbody>

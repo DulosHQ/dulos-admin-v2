@@ -1159,7 +1159,7 @@ export default function EventsPage() {
           <div className="section-card-header">
             <span className="section-card-title">🏟️ Recintos ({allVenues.length})</span>
           </div>
-          <div className="section-card-body">
+          <div className="section-card-body overflow-x-auto">
             <table className="data-table text-xs">
               <thead>
                 <tr>
