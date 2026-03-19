@@ -371,107 +371,50 @@ export default function OpsPage() {
         <div className="p-3 sm:p-4">
           {/* Check-ins Tab */}
           {activeTab === 'checkins' && (
-            <div className="space-y-4">
-              {/* Scanner Section — Hero */}
-              <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl p-3 sm:p-4 text-white">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  {/* Left: Scanner */}
-                  <div className="lg:col-span-1">
-                    <h2 className="text-xs sm:text-sm font-bold mb-2 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                      ESCÁNER ACTIVO
-                    </h2>
-                    {cameraActive ? (
-                      <div className="relative">
-                        <video ref={videoRef} autoPlay playsInline muted className="w-full aspect-[4/3] rounded-lg bg-black object-cover" />
-                        <div className="absolute inset-0 border-2 border-[#EF4444] rounded-lg pointer-events-none">
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 sm:w-32 h-24 sm:h-32 border-2 border-white/40 rounded-lg" />
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-24 sm:h-32 bg-[#EF4444]/30 animate-pulse" />
-                        </div>
-                        <button onClick={stopCamera} className="absolute bottom-2 right-2 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors">
-                          Cerrar Cámara
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={manualTicket}
-                            onChange={e => setManualTicket(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleManualScan()}
-                            placeholder="TKT-2026-0001 o token..."
-                            className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-xs sm:text-sm text-white placeholder-white/40 focus:outline-none focus:border-[#EF4444]"
-                          />
-                          <button onClick={handleManualScan} className="px-3 py-2 bg-[#EF4444] rounded-lg text-xs font-bold hover:bg-[#c5303c] transition-colors">Validar</button>
-                        </div>
-                        <button onClick={startCamera} className="w-full py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center gap-2">
-                          📷 Abrir Cámara QR
-                        </button>
-                      </div>
-                    )}
-                    {scanResult && (
-                      <div className={`mt-2 p-2 rounded-lg text-xs sm:text-sm font-medium ${scanResult.ok ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
-                        {scanResult.ok ? '✅' : '❌'} {scanResult.msg}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Right: Live stats */}
-                  <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                    <div className="bg-white/10 rounded-lg p-2 sm:p-3">
-                      <p className="text-white/50 text-[9px] sm:text-[10px] uppercase font-semibold">Check-ins</p>
-                      <p className="text-xl sm:text-2xl font-bold">{checkins.length}</p>
-                    </div>
-                    <div className="bg-white/10 rounded-lg p-2 sm:p-3">
-                      <p className="text-white/50 text-[9px] sm:text-[10px] uppercase font-semibold">Exitosos</p>
-                      <p className="text-xl sm:text-2xl font-bold text-green-400">{totalOk}</p>
-                    </div>
-                    <div className="bg-white/10 rounded-lg p-2 sm:p-3">
-                      <p className="text-white/50 text-[9px] sm:text-[10px] uppercase font-semibold">Fallidos</p>
-                      <p className="text-xl sm:text-2xl font-bold text-red-400">{totalFail}</p>
-                    </div>
-                    <div className="bg-white/10 rounded-lg p-2 sm:p-3">
-                      <p className="text-white/50 text-[9px] sm:text-[10px] uppercase font-semibold">Prom/Hora</p>
-                      <p className="text-xl sm:text-2xl font-bold">{avgPerHour}</p>
-                    </div>
-
-                    {/* Ticket inventory */}
-                    <div className="col-span-2 sm:col-span-4 bg-white/5 rounded-lg p-2 sm:p-3">
-                      <p className="text-white/50 text-[9px] sm:text-[10px] uppercase font-semibold mb-2">Inventario de Boletos</p>
-                      <div className="flex flex-wrap gap-2 sm:gap-3 text-[10px] sm:text-xs">
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400" /> Válidos: {ticketsByStatus['valid'] || 0}</span>
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400" /> Usados: {ticketsByStatus['used'] || 0}</span>
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-400" /> Pendientes: {ticketsByStatus['pending'] || 0}</span>
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" /> Cancelados: {ticketsByStatus['cancelled'] || 0}</span>
-                      </div>
-                      <div className="mt-2 h-2 bg-white/10 rounded-full overflow-hidden flex">
-                        {tickets.length > 0 && <>
-                          <div className="h-full bg-green-400" style={{ width: `${((ticketsByStatus['valid'] || 0) / tickets.length) * 100}%` }} />
-                          <div className="h-full bg-blue-400" style={{ width: `${((ticketsByStatus['used'] || 0) / tickets.length) * 100}%` }} />
-                          <div className="h-full bg-yellow-400" style={{ width: `${((ticketsByStatus['pending'] || 0) / tickets.length) * 100}%` }} />
-                          <div className="h-full bg-red-400" style={{ width: `${((ticketsByStatus['cancelled'] || 0) / tickets.length) * 100}%` }} />
-                        </>}
-                      </div>
-                    </div>
-
-                    {/* Check-ins by event bars */}
-                    <div className="col-span-2 sm:col-span-4 bg-white/5 rounded-lg p-2 sm:p-3">
-                      <p className="text-white/50 text-[9px] sm:text-[10px] uppercase font-semibold mb-2">Check-ins por Evento</p>
-                      <div className="space-y-1.5">
-                        {eventStats.map(e => (
-                          <div key={e.name} className="flex items-center gap-2">
-                            <span className="text-[10px] sm:text-xs w-20 sm:w-24 truncate text-white/70">{e.name}</span>
-                            <div className="flex-1 h-2 sm:h-2.5 bg-white/10 rounded-full overflow-hidden">
-                              <div className="h-full rounded-full bg-[#EF4444]" style={{ width: `${e.pct}%` }} />
-                            </div>
-                            <span className="text-[10px] sm:text-xs text-white/50 w-12 sm:w-14 text-right">{e.count} ({e.pct}%)</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+            <div className="space-y-3">
+              {/* Scanner — compact inline */}
+              <div className="flex flex-col sm:flex-row gap-2 items-stretch">
+                <div className="flex gap-2 flex-1">
+                  <input
+                    type="text"
+                    value={manualTicket}
+                    onChange={e => setManualTicket(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleManualScan()}
+                    placeholder="TKT-2026-0001 o token..."
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
+                  />
+                  <button onClick={handleManualScan} className="px-3 py-2 bg-[#EF4444] text-white rounded-lg text-xs font-bold hover:bg-[#c5303c] transition-colors whitespace-nowrap">Validar</button>
+                  <button onClick={cameraActive ? stopCamera : startCamera} className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-50 whitespace-nowrap">
+                    {cameraActive ? '✕ Cerrar' : '📷 QR'}
+                  </button>
                 </div>
+                {/* Inline stats */}
+                <div className="flex gap-2 text-[10px] font-bold items-center flex-shrink-0">
+                  <span className="bg-gray-100 px-2 py-1.5 rounded">{checkins.length} check-ins</span>
+                  <span className="bg-green-50 text-green-700 px-2 py-1.5 rounded">{totalOk} ✓</span>
+                  <span className="bg-red-50 text-red-600 px-2 py-1.5 rounded">{totalFail} ✗</span>
+                  <span className="bg-gray-50 text-gray-500 px-2 py-1.5 rounded">{avgPerHour}/h</span>
+                </div>
+              </div>
+
+              {cameraActive && (
+                <div className="relative max-w-xs">
+                  <video ref={videoRef} autoPlay playsInline muted className="w-full aspect-[4/3] rounded-lg bg-black object-cover" />
+                </div>
+              )}
+
+              {scanResult && (
+                <div className={`p-2 rounded-lg text-xs font-bold ${scanResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                  {scanResult.ok ? '✅' : '❌'} {scanResult.msg}
+                </div>
+              )}
+
+              {/* Ticket inventory — compact inline */}
+              <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
+                <span className="flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded">● Válidos: {ticketsByStatus['valid'] || 0}</span>
+                <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded">● Usados: {ticketsByStatus['used'] || 0}</span>
+                <span className="flex items-center gap-1 bg-yellow-50 text-yellow-700 px-2 py-1 rounded">● Pendientes: {ticketsByStatus['pending'] || 0}</span>
+                <span className="flex items-center gap-1 bg-red-50 text-red-600 px-2 py-1 rounded">● Cancelados: {ticketsByStatus['cancelled'] || 0}</span>
               </div>
 
               {/* Check-ins History Table */}
