@@ -997,6 +997,7 @@ export default function EventsPage() {
   const [venueMap, setVenueMap] = useState<Map<string, Venue>>(new Map());
   const [allVenues, setAllVenues] = useState<Venue[]>([]);
   const [venueSeatCounts, setVenueSeatCounts] = useState<Map<string, number>>(new Map());
+  const [venueSeatData, setVenueSeatData] = useState<Map<string, VenueSeat[]>>(new Map());
   const [venueFilter, setVenueFilter] = useState({ city: '', type: '' });
   const [expandedVenueId, setExpandedVenueId] = useState<string | null>(null);
   const [eventDashboardData, setEventDashboardData] = useState<EventDashboard[]>([]);
@@ -1034,13 +1035,20 @@ export default function EventsPage() {
       setEvents(events);
       setEventDashboardData(dashboardData);
 
-      // Fetch venue_seats counts for Recintos display
+      // Fetch venue_seats for Recintos display (counts + full data for drill-down)
       if (venuesList.length > 0) {
-        Promise.all(venuesList.map(v => fetchVenueSeats(v.id).then(seats => ({ id: v.id, count: seats.length })).catch(() => ({ id: v.id, count: 0 }))))
+        Promise.all(venuesList.map(v => fetchVenueSeats(v.id).then(seats => ({ id: v.id, seats })).catch(() => ({ id: v.id, seats: [] as VenueSeat[] }))))
           .then(results => {
-            const map = new Map<string, number>();
-            results.forEach(r => { if (r.count > 0) map.set(r.id, r.count); });
-            setVenueSeatCounts(map);
+            const countMap = new Map<string, number>();
+            const dataMap = new Map<string, VenueSeat[]>();
+            results.forEach(r => {
+              if (r.seats.length > 0) {
+                countMap.set(r.id, r.seats.length);
+                dataMap.set(r.id, r.seats);
+              }
+            });
+            setVenueSeatCounts(countMap);
+            setVenueSeatData(dataMap);
           });
       }
 
@@ -1561,6 +1569,51 @@ export default function EventsPage() {
                             ) : (
                               <p className="text-xs text-gray-400 py-2">Sin eventos registrados</p>
                             )}
+                            {/* Venue Seats Summary */}
+                            {(() => {
+                              const seats = venueSeatData.get(v.id);
+                              if (!seats || seats.length === 0) return null;
+                              // Group seats by section
+                              const sectionMap = new Map<string, { count: number; rows: Set<string> }>();
+                              seats.forEach(s => {
+                                const sec = s.section || 'General';
+                                const existing = sectionMap.get(sec) || { count: 0, rows: new Set<string>() };
+                                existing.count++;
+                                if (s.row_label) existing.rows.add(s.row_label);
+                                sectionMap.set(sec, existing);
+                              });
+                              const sections = Array.from(sectionMap.entries()).sort((a, b) => b[1].count - a[1].count);
+                              return (
+                                <div className="mt-2">
+                                  <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Asientos Mapeados ({seats.length})</p>
+                                  <div className="overflow-x-auto"><table className="w-full text-xs">
+                                    <thead className="bg-[#1a1a2e] text-white">
+                                      <tr>
+                                        <th className="px-3 py-1.5 text-left text-[10px] font-bold">Sección</th>
+                                        <th className="px-3 py-1.5 text-right text-[10px] font-bold">Asientos</th>
+                                        <th className="px-3 py-1.5 text-right text-[10px] font-bold">Filas</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {sections.map(([sec, data], i) => (
+                                        <tr key={i} className="border-b border-gray-100">
+                                          <td className="px-3 py-1.5 font-bold">{sec}</td>
+                                          <td className="px-3 py-1.5 text-right">{data.count}</td>
+                                          <td className="px-3 py-1.5 text-right text-gray-500">{data.rows.size > 0 ? data.rows.size : '—'}</td>
+                                        </tr>
+                                      ))}
+                                      {sections.length > 1 && (
+                                        <tr className="bg-[#1a1a2e] text-white font-bold">
+                                          <td className="px-3 py-1.5">Total</td>
+                                          <td className="px-3 py-1.5 text-right">{seats.length}</td>
+                                          <td className="px-3 py-1.5 text-right">{new Set(seats.map(s => s.row_label).filter(Boolean)).size || '—'}</td>
+                                        </tr>
+                                      )}
+                                    </tbody>
+                                  </table></div>
+                                </div>
+                              );
+                            })()}
                           </div>
                         </td>
                       </tr>
