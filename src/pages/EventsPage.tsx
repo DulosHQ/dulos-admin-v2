@@ -448,7 +448,9 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
   const [expandedSchedule, setExpandedSchedule] = useState<string | null>(null);
   const [venueSeats, setVenueSeats] = useState<VenueSeat[]>([]);
   const [sectionSeats, setSectionSeats] = useState<(EventSectionSeat & { section_name?: string })[]>([]);
-  const [showSeatMap, setShowSeatMap] = useState(false);
+  // Auto-show seat map for reserved events (zone_type, not event_type)
+  const hasReservedZones = project.events.flatMap(e => e.zones).some(z => z.tipo === 'reserved' || z.tipo === 'numbered');
+  const [showSeatMap, setShowSeatMap] = useState(hasReservedZones);
 
   const isReserved = project.event_type === 'reserved' || project.event_type === 'hybrid';
 
@@ -537,6 +539,36 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
               </div>
             </div>
 
+            {/* For RECURRING events: show schedules FIRST (buyer picks date) */}
+            {project.event_type === 'recurring' && allSchedules.length > 0 && (
+              <div className="section-card ring-1 ring-indigo-200">
+                <div className="section-card-header">
+                  <h4 className="section-card-title">
+                    📅 Funciones ({allSchedules.length})
+                    <span className="ml-2 text-[10px] text-indigo-500 font-normal">El comprador elige fecha primero</span>
+                  </h4>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="data-table text-xs">
+                    <thead><tr><th>Fecha</th><th>Horario</th><th className="text-right">Vendidos</th></tr></thead>
+                    <tbody>
+                      {allSchedules.map((s) => {
+                        const inv = schedInv.filter(si => si.schedule_id === s.id);
+                        const totalSchedSold = inv.reduce((sum, si) => sum + (si.sold || 0), 0);
+                        return (
+                          <tr key={s.id} className={inv.length > 0 ? 'cursor-pointer' : ''} onClick={() => inv.length > 0 && setExpandedSchedule(expandedSchedule === s.id ? null : s.id)}>
+                            <td className="font-bold">{formatDate(s.fecha)}</td>
+                            <td className="text-gray-600">{s.horaInicio}{s.horaFin ? ` — ${s.horaFin}` : ''}</td>
+                            <td className="text-right font-bold text-[#EF4444]">{totalSchedSold || s.vendidos}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {allZones.length > 0 && (
               <div className="section-card">
                 <div className="overflow-x-auto">
@@ -598,13 +630,11 @@ function EventDetailPanel({ project, dashboardData }: { project: ProjectDisplay;
               </div>
             )}
 
-            {allSchedules.length > 0 && (
-              <div className={`section-card ${project.event_type === 'recurring' ? 'ring-1 ring-indigo-200' : ''}`}>
+            {/* Schedules for single/multiday (recurring already shown above zones) */}
+            {allSchedules.length > 0 && project.event_type !== 'recurring' && (
+              <div className="section-card">
                 <div className="section-card-header">
-                  <h4 className="section-card-title">
-                    Funciones ({allSchedules.length})
-                    {project.event_type === 'recurring' && <span className="ml-2 text-[10px] text-indigo-500 font-normal">El comprador elige fecha</span>}
-                  </h4>
+                  <h4 className="section-card-title">Funciones ({allSchedules.length})</h4>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="data-table">
