@@ -28,6 +28,8 @@ import {
   SalesSummary,
 } from '../lib/supabase';
 
+const fmtCurrency = (n: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(n);
+
 interface Alerta {
   id: number | string;
   tipo: 'critico' | 'warning' | 'info';
@@ -210,8 +212,6 @@ export default function SummaryPage() {
         const curAvg = curTix > 0 ? curRev / curTix : 0;
         const prevAvg = prevTix > 0 ? prevRev / prevTix : 0;
         const avgPriceChange = pctChange(curAvg, prevAvg);
-
-        const fmtCurrency = (n: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(n);
 
         setMetrics([
           { label: 'Ingresos Totales', value: fmtCurrency(totalRevenue), change: revenueChange, iconKey: 'revenue' },
@@ -579,7 +579,7 @@ export default function SummaryPage() {
                       <span>{f.hora} · {f.sala}</span>
                     </p>
                     <div className="flex items-center justify-between mt-0.5">
-                      <span className="text-[11px] sm:text-[12px] font-black text-[#EF4444]">${f.revenue.toLocaleString()}</span>
+                      <span className="text-[11px] sm:text-[12px] font-black text-[#EF4444]">{fmtCurrency(f.revenue)}</span>
                       <span className={`text-[10px] sm:text-[11px] font-bold ${f.available < 50 ? 'text-red-500' : 'text-emerald-600'}`}>{f.available} disp.</span>
                     </div>
                   </div>
@@ -620,7 +620,7 @@ export default function SummaryPage() {
                   <p className="text-sm text-gray-500">{expandedEventData.hora}</p>
                   {expandedEventData.revenue > 0 && (
                     <div className="flex items-center gap-4 mt-1">
-                      <p className="text-lg font-black text-[#EF4444]">${expandedEventData.revenue.toLocaleString()} MXN</p>
+                      <p className="text-lg font-black text-[#EF4444]">{fmtCurrency(expandedEventData.revenue)}</p>
                       <p className="text-sm text-gray-500">{expandedEventData.orders} órdenes · {expandedEventData.ticketsSold} boletos</p>
                     </div>
                   )}
@@ -666,11 +666,11 @@ export default function SummaryPage() {
                       {eventZoneDetails.map((z, idx) => (
                         <tr key={idx}>
                           <td className="font-bold">{z.zone_name}</td>
-                          <td className="text-right">${z.price.toLocaleString()}</td>
+                          <td className="text-right">{fmtCurrency(z.price)}</td>
                           <td className="text-right">{z.capacity}</td>
                           <td className="text-right">{z.sold}</td>
                           <td className={`text-right font-bold ${z.available < 50 ? 'text-red-500' : ''}`}>{z.available}</td>
-                          <td className="text-right font-bold text-[#EF4444]">${z.revenue.toLocaleString()}</td>
+                          <td className="text-right font-bold text-[#EF4444]">{fmtCurrency(z.revenue)}</td>
                           <td className="text-right">
                             <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-bold text-white ${z.percentage >= 80 ? 'bg-red-500' : z.percentage >= 50 ? 'bg-yellow-500' : 'bg-green-500'}`}>
                               {z.percentage}%
@@ -685,7 +685,7 @@ export default function SummaryPage() {
                           <td className="text-right">{eventZoneDetails.reduce((s, z) => s + z.capacity, 0)}</td>
                           <td className="text-right">{eventZoneDetails.reduce((s, z) => s + z.sold, 0)}</td>
                           <td className="text-right">{eventZoneDetails.reduce((s, z) => s + z.available, 0)}</td>
-                          <td className="text-right font-bold">${eventZoneDetails.reduce((s, z) => s + z.revenue, 0).toLocaleString()}</td>
+                          <td className="text-right font-bold">{fmtCurrency(eventZoneDetails.reduce((s, z) => s + z.revenue, 0))}</td>
                           <td></td>
                         </tr>
                       )}
@@ -728,7 +728,7 @@ export default function SummaryPage() {
                   <p className="flex-1 text-xs sm:text-[13px] text-gray-700 truncate font-medium">{a.mensaje}</p>
                   {a.monto !== undefined && a.monto > 0 && (
                     <span className="text-[11px] sm:text-[12px] text-emerald-600 font-bold tabular-nums flex-shrink-0">
-                      ${a.monto.toLocaleString()}
+                      {fmtCurrency(a.monto)}
                     </span>
                   )}
                   <span className="text-[11px] sm:text-[12px] text-gray-400 tabular-nums font-semibold flex-shrink-0">{a.tiempo}</span>

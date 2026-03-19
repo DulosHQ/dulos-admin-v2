@@ -39,6 +39,10 @@ function formatTime(d: string) {
   return new Date(d).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
 }
 
+function fmtCurrency(value: number): string {
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(value);
+}
+
 // Data parsing helper functions
 function parseEventoName(evento: string): string {
   if (evento.length > 50) {
@@ -618,7 +622,7 @@ export default function OpsPage() {
                               {customer.phone && <p className="text-[10px] text-gray-400">{customer.phone}</p>}
                               <div className="flex gap-2 mt-1 text-[10px]">
                                 <span className="text-green-600 font-bold">
-                                  ${(customer.total_spent || 0).toLocaleString()}
+                                  {fmtCurrency(customer.total_spent || 0)}
                                 </span>
                                 <span className="text-blue-600">
                                   {customer.total_orders} órdenes
@@ -652,7 +656,7 @@ export default function OpsPage() {
                           ) : customerHistory.length > 0 ? (
                             <div>
                               {customerHistory[0]?.is_vip && (
-                                <span className="inline-block mb-2 text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">⭐ VIP — {customerHistory[0]?.total_purchases} compras · ${(customerHistory[0]?.total_spent || 0).toLocaleString()}</span>
+                                <span className="inline-block mb-2 text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">⭐ VIP — {customerHistory[0]?.total_purchases} compras · {fmtCurrency(customerHistory[0]?.total_spent || 0)}</span>
                               )}
                               <div className="overflow-x-auto"><table className="data-table text-xs w-full">
                                 <thead>
@@ -672,7 +676,7 @@ export default function OpsPage() {
                                       <td className="truncate max-w-[120px]">{h.event_name}</td>
                                       <td className="hidden sm:table-cell">{h.zone_name}</td>
                                       <td className="text-right">{h.quantity}</td>
-                                      <td className="text-right font-bold">${(h.total_price || 0).toLocaleString()}</td>
+                                      <td className="text-right font-bold">{fmtCurrency(h.total_price || 0)}</td>
                                       <td>
                                         <div className="flex items-center gap-1">
                                           <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${h.payment_status === 'completed' ? 'bg-green-500' : h.payment_status === 'refunded' ? 'bg-red-500' : 'bg-yellow-500'}`}>
@@ -780,7 +784,7 @@ export default function OpsPage() {
                   const discountVal = c.discount_value || 0
                   const usedCount = c.used_count || 0
                   const discType = c.discount_type || 'flat'
-                  const discLabel = discType === 'percentage' ? `${discountVal}%` : `$${discountVal.toLocaleString()}`
+                  const discLabel = discType === 'percentage' ? `${discountVal}%` : fmtCurrency(discountVal)
 
                   return (
                     <tr key={c.id}>
@@ -1032,7 +1036,7 @@ export default function OpsPage() {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
                       <div className="text-center p-2 bg-white rounded">
                         <p className="text-lg font-bold text-[#EF4444]">
-                          ${(selectedCustomer.total_spent || 0).toLocaleString()}
+                          {fmtCurrency(selectedCustomer.total_spent || 0)}
                         </p>
                         <p className="text-xs text-gray-500">Total Gastado</p>
                       </div>
