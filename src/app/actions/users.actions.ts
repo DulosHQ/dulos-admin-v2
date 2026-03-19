@@ -69,63 +69,26 @@ export async function inviteUser(formData: UserInviteFormData) {
     }
     const data = await res.json();
 
-    // Step 2: Send invite via Supabase Auth Admin
-    // Creates auth user + sends invitation email
+    // Step 2: Send beautiful invite email via internal API route
     let emailSent = false;
     let emailMethod = 'none';
 
-    // Try Resend first (if configured) for beautiful custom email
-    const RESEND_API_KEY = process.env.RESEND_API_KEY;
-    if (RESEND_API_KEY) {
-      try {
-        const { Resend } = await import('resend');
-        const { inviteEmailHTML } = await import('@/lib/email-templates');
-        const resend = new Resend(RESEND_API_KEY);
-        const html = inviteEmailHTML({
-          name,
-          role: parsed.data.role,
-          loginUrl: 'https://dulos-admin-v2.vercel.app/login',
-        });
-
-        const { error: resendError } = await resend.emails.send({
-          from: process.env.RESEND_FROM_EMAIL || 'Dulos <noreply@dulos.io>',
-          to: parsed.data.email,
-          subject: `🎫 Bienvenido a Dulos — Acceso como ${
-            parsed.data.role === 'super_admin' ? 'Administrador' :
-            parsed.data.role === 'operator' ? 'Operador' :
-            parsed.data.role === 'analyst' ? 'Analista' : 'Taquillero'
-          }`,
-          html,
-        });
-
-        if (!resendError) {
-          emailSent = true;
-          emailMethod = 'resend';
-        }
-      } catch (e) {
-        console.warn('Resend error:', e);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'https://dulos-admin-v2.vercel.app';
+      const emailRes = await fetch(`${baseUrl}/api/invite/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: parsed.data.email, name, role: parsed.data.role }),
+      });
+      if (emailRes.ok) {
+        const result = await emailRes.json();
+        emailSent = result.emailSent || false;
+        emailMethod = result.emailMethod || 'api';
       }
-    }
-
-    // Fallback: webhook to external email service (no more ugly Supabase Auth emails)
-    if (!emailSent) {
-      try {
-        // Call external webhook for beautiful email delivery
-        const webhookUrl = process.env.INVITE_WEBHOOK_URL;
-        if (webhookUrl) {
-          const webhookRes = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: parsed.data.email, name, role: parsed.data.role }),
-          });
-          if (webhookRes.ok) {
-            emailSent = true;
-            emailMethod = 'webhook';
-          }
-        }
-      } catch (e) {
-        console.warn('Webhook email error:', e);
-      }
+    } catch (e) {
+      console.warn('Email API error:', e);
     }
 
     logAction('invite', 'user', data[0]?.id || '', JSON.stringify({ email: parsed.data.email, role: parsed.data.role, emailSent, emailMethod }));
