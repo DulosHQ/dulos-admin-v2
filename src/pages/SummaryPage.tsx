@@ -707,7 +707,7 @@ export default function SummaryPage() {
               <span className="font-bold text-gray-900 text-sm">Actividad Reciente</span>
               {salesTrendData.length > 0 && (
                 <div className="ml-auto" style={{ width: 80, height: 24, minHeight: 24 }}>
-                  <ResponsiveContainer width="100%" height="100%" minWidth={50} minHeight={20}>
+                  <ResponsiveContainer width="100%" height="100%" minWidth={50} minHeight={20} debounceDelay={1}>
                     <AreaChart data={salesTrendData} margin={{ top: 2, right: 0, left: 0, bottom: 2 }}>
                       <defs>
                         <linearGradient id="miniSalesGrad" x1="0" y1="0" x2="0" y2="1">

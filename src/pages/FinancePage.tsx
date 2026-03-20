@@ -1086,7 +1086,7 @@ export default function FinancePage() {
                 </div>
                 <div className="section-card-body">
                   <div style={{ width: '100%', height: 180 }}>
-                    <ResponsiveContainer width="99%" height={180}>
+                    <ResponsiveContainer width="99%" height={180} debounceDelay={1}>
                       <BarChart data={dailyRevenueData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
                         <XAxis dataKey="label" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                         <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={fmtAxisCurrency} width={45} />
@@ -1105,7 +1105,7 @@ export default function FinancePage() {
                 </div>
                 <div className="section-card-body">
                   <div style={{ width: '100%', height: 180 }}>
-                    <ResponsiveContainer width="99%" height={180}>
+                    <ResponsiveContainer width="99%" height={180} debounceDelay={1}>
                       <BarChart data={dayOfWeekData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
                         <XAxis dataKey="day" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                         <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={fmtAxisCurrency} width={45} />
