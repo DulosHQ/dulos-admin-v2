@@ -668,7 +668,7 @@ function EventDetailPanel({ project, dashboardData, venueMap }: { project: Proje
         vendidos: d.zone_sold || 0,
       }))
     : projectZones;
-  const allSchedules = project.events.flatMap((e) => e.schedules);
+  const allSchedules = project.events.flatMap((e) => e.schedules).sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
 
   const firstEvent = project.events[0];
   const venue = firstEvent?.venue || '';
@@ -721,19 +721,32 @@ function EventDetailPanel({ project, dashboardData, venueMap }: { project: Proje
             </div>
 
             {/* For RECURRING events: show schedules FIRST (buyer picks date) */}
-            {project.event_type === 'recurring' && allSchedules.length > 0 && (
+            {project.event_type === 'recurring' && allSchedules.length > 0 && (() => {
+              const MAX_VISIBLE = 6;
+              const hasMany = allSchedules.length > MAX_VISIBLE;
+              const [showAllSchedules, setShowAllSchedules] = React.useState(false);
+              const visibleSchedules = (hasMany && !showAllSchedules) ? allSchedules.slice(0, MAX_VISIBLE) : allSchedules;
+              const totalSchedSoldAll = allSchedules.reduce((sum, s) => {
+                const inv = schedInv.filter(si => si.schedule_id === s.id);
+                return sum + inv.reduce((iSum, si) => iSum + (si.sold || 0), 0) + (s.vendidos || 0);
+              }, 0);
+              const totalSchedCap = allSchedules.length * (allZones.reduce((sum, z) => sum + (z.capacidad || 0), 0) || 100);
+              return (
               <div className="section-card ring-1 ring-indigo-200">
                 <div className="section-card-header">
                   <h4 className="section-card-title">
                     📅 Funciones ({allSchedules.length})
                     <span className="ml-2 text-[10px] text-indigo-500 font-normal">El comprador elige fecha primero</span>
                   </h4>
+                  {allSchedules.length > 1 && (
+                    <span className="ml-auto text-[10px] text-gray-400">{totalSchedSoldAll}/{totalSchedCap} vendidos total</span>
+                  )}
                 </div>
                 <div className="overflow-x-auto">
                   <table className="data-table text-xs">
                     <thead><tr><th>Fecha</th><th>Horario</th><th className="text-right">Vendidos</th></tr></thead>
                     <tbody>
-                      {allSchedules.map((s) => {
+                      {visibleSchedules.map((s) => {
                         const inv = schedInv.filter(si => si.schedule_id === s.id);
                         const totalSchedSold = inv.reduce((sum, si) => sum + (si.sold || 0), 0);
                         return (
@@ -746,9 +759,18 @@ function EventDetailPanel({ project, dashboardData, venueMap }: { project: Proje
                       })}
                     </tbody>
                   </table>
+                  {hasMany && (
+                    <button
+                      onClick={() => setShowAllSchedules(!showAllSchedules)}
+                      className="w-full py-2 text-xs text-indigo-600 hover:text-indigo-800 font-medium border-t border-gray-100"
+                    >
+                      {showAllSchedules ? `▲ Mostrar solo ${MAX_VISIBLE}` : `▼ Ver las ${allSchedules.length} funciones`}
+                    </button>
+                  )}
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {allZones.length > 0 && (() => {
               // Only show Tipo column when zones have MIXED types
@@ -905,19 +927,27 @@ function EventDetailPanel({ project, dashboardData, venueMap }: { project: Proje
                 </div>
               </div>
             )}
-            {/* Venue SVG Layout Map — shows for any event whose venue has a map */}
-            {venueData?.layout_svg_url && (
+            {/* Venue Layout Map — SVG preferred, fallback to image_url */}
+            {(venueData?.layout_svg_url || venueData?.image_url) && (
               <div className="section-card">
                 <div className="section-card-header">
                   <span className="section-card-title">🏟️ Mapa del Recinto</span>
                   <span className="ml-auto text-xs text-gray-400">{venueData.name}</span>
                 </div>
                 <div className="section-card-body flex justify-center">
-                  <CachedSvgImage
-                    src={venueData.layout_svg_url}
-                    alt={`Mapa ${venueData.name}`}
-                    className="max-w-full max-h-64 object-contain rounded"
-                  />
+                  {venueData.layout_svg_url ? (
+                    <CachedSvgImage
+                      src={venueData.layout_svg_url}
+                      alt={`Mapa ${venueData.name}`}
+                      className="max-w-full max-h-64 object-contain rounded"
+                    />
+                  ) : venueData.image_url ? (
+                    <img
+                      src={venueData.image_url}
+                      alt={`Mapa ${venueData.name}`}
+                      className="max-w-full max-h-64 object-contain rounded"
+                    />
+                  ) : null}
                 </div>
               </div>
             )}
@@ -1544,14 +1574,22 @@ export default function EventsPage() {
                               <a href={v.maps_url || `https://www.google.com/maps/search/${encodeURIComponent(v.name + ' ' + (v.city || '') + ' ' + (v.state || ''))}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline">📍 Ver en Maps</a>
                             </div>
                             {/* SVG Layout Map — cached to prevent flickering */}
-                            {v.layout_svg_url ? (
+                            {(v.layout_svg_url || v.image_url) ? (
                               <div className="mt-2 rounded-lg border border-gray-200 bg-white p-2 overflow-hidden">
                                 <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Mapa del Recinto</p>
-                                <CachedSvgImage
-                                  src={v.layout_svg_url}
-                                  alt={`Mapa ${v.name}`}
-                                  className="w-full max-h-48 object-contain rounded"
-                                />
+                                {v.layout_svg_url ? (
+                                  <CachedSvgImage
+                                    src={v.layout_svg_url}
+                                    alt={`Mapa ${v.name}`}
+                                    className="w-full max-h-48 object-contain rounded"
+                                  />
+                                ) : (
+                                  <img
+                                    src={v.image_url!}
+                                    alt={`Mapa ${v.name}`}
+                                    className="w-full max-h-48 object-contain rounded"
+                                  />
+                                )}
                               </div>
                             ) : (
                               <div className="mt-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3 text-center">
