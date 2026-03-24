@@ -82,6 +82,7 @@ export default function OpsPage() {
   const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null)
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [cameraActive, setCameraActive] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
   const [scanResult, setScanResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [manualTicket, setManualTicket] = useState('')
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -237,17 +238,17 @@ export default function OpsPage() {
         await videoRef.current.play()
       }
       setCameraActive(true)
+      setCameraError(null)
       setScanResult(null)
       toast.success('Cámara activa — apunta al código QR')
     } catch (err: unknown) {
-      const errorMsg = err instanceof DOMException
-        ? err.name === 'NotAllowedError'
-          ? 'Permiso de cámara denegado. Habilita el acceso en la configuración del navegador.'
-          : err.name === 'NotFoundError'
-            ? 'No se encontró una cámara en este dispositivo.'
-            : `Error de cámara: ${err.message}`
-        : 'No se pudo acceder a la cámara'
-      toast.error(errorMsg)
+      if (err instanceof DOMException && err.name === 'NotAllowedError') {
+        setCameraError('Permiso de cámara denegado. Haz clic en el ícono de candado 🔒 en la barra de dirección → Permisos → Cámara → Permitir, luego recarga la página.')
+      } else if (err instanceof DOMException && err.name === 'NotFoundError') {
+        setCameraError('No se encontró una cámara en este dispositivo. Usa la validación manual con el código del boleto.')
+      } else {
+        setCameraError('No se pudo acceder a la cámara. Intenta recargar la página.')
+      }
     }
   }, [])
 
@@ -428,6 +429,17 @@ export default function OpsPage() {
                 </div>
               )}
 
+              {cameraError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+                  <span className="text-red-500 text-lg flex-shrink-0">⚠️</span>
+                  <div>
+                    <p className="text-xs font-bold text-red-700">Error de cámara</p>
+                    <p className="text-xs text-red-600 mt-0.5">{cameraError}</p>
+                    <button onClick={() => { setCameraError(null); startCamera(); }} className="mt-2 px-3 py-1 bg-red-100 text-red-700 rounded text-xs font-bold hover:bg-red-200">Reintentar</button>
+                  </div>
+                </div>
+              )}
+
               {scanResult && (
                 <div className={`p-2 rounded-lg text-xs font-bold ${scanResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                   {scanResult.ok ? '✅' : '❌'} {scanResult.msg}
@@ -563,7 +575,8 @@ export default function OpsPage() {
               {pendingGuests.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                   <h3 className="text-sm font-extrabold text-red-700 mb-1">⚠️ Clientes Pendientes ({pendingGuests.length})</h3>
-                  <p className="text-xs text-red-600 mb-2">Pagaron pero no recibieron boletos — requiere acción manual</p>
+                  <p className="text-xs text-red-600 mb-1">Pagaron pero no recibieron boletos — requiere acción manual</p>
+                  <p className="text-[10px] text-red-500 mb-2">💡 Busca el Payment ID en Stripe para encontrar datos del comprador y reenviar boletos</p>
                   <div className="overflow-x-auto">
                     <table className="data-table text-xs">
                       <thead><tr><th>Nombre</th><th>Email</th><th>Teléfono</th><th className="hidden sm:table-cell">Payment ID</th><th>Fecha</th></tr></thead>
@@ -575,7 +588,7 @@ export default function OpsPage() {
                             <td className="font-bold">{guest.name ? `${guest.name} ${guest.lastName || ''}`.trim() : '—'}</td>
                             <td className="text-gray-500">{guest.email || '—'}</td>
                             <td className="whitespace-nowrap">{guest.phone || '—'}</td>
-                            <td className="hidden sm:table-cell text-gray-400 font-mono text-[10px]">{pg.payment_intent_id ? pg.payment_intent_id.slice(0, 12) + '…' : '—'}</td>
+                            <td className="text-[10px]">{pg.payment_intent_id ? <a href={`https://dashboard.stripe.com/payments/${pg.payment_intent_id}`} target="_blank" rel="noopener noreferrer" className="font-mono text-blue-500 hover:underline">{pg.payment_intent_id.slice(0, 15)}…</a> : '—'}</td>
                             <td className="whitespace-nowrap">{pg.created_at ? new Date(pg.created_at).toLocaleDateString('es-MX', {day:'numeric',month:'short'}) : '—'}</td>
                           </tr>
                           );
@@ -884,7 +897,7 @@ export default function OpsPage() {
       {blogPosts.length > 0 && (
         <div className="section-card">
           <div className="section-card-header">
-            <span className="section-card-title">📝 Blog ({blogPosts.length})</span>
+            <span className="section-card-title">📝 Blog / SEO ({blogPosts.length})</span>
           </div>
           <div className="section-card-body overflow-x-auto">
             <table className="data-table text-xs">

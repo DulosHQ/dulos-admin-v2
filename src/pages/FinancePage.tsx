@@ -233,7 +233,7 @@ export default function FinancePage() {
 
     // Event revenues from sales summary (REAL DATA)
     // Aggregate events with same name (different venues) into one row
-    const eventAggMap = new Map<string, { event_ids: string[]; event_name: string; venues: { venue_name: string; event_id: string; revenue: number; orders: number; tickets: number }[]; revenue: number; orders: number; tickets: number; image_url?: string }>();
+    const eventAggMap = new Map<string, { event_ids: string[]; event_name: string; venues: { venue_name: string; event_id: string; revenue: number; orders: number; tickets: number }[]; revenue: number; orders: number; tickets: number; refunded: number; image_url?: string }>();
     filteredSalesSummary.forEach(s => {
       const existing = eventAggMap.get(s.event_name);
       if (existing) {
@@ -242,6 +242,7 @@ export default function FinancePage() {
         existing.revenue += s.total_revenue;
         existing.orders += s.total_orders;
         existing.tickets += s.total_tickets_sold;
+        existing.refunded += s.refunded || 0;
       } else {
         eventAggMap.set(s.event_name, {
           event_ids: [s.event_id],
@@ -250,6 +251,7 @@ export default function FinancePage() {
           revenue: s.total_revenue,
           orders: s.total_orders,
           tickets: s.total_tickets_sold,
+          refunded: s.refunded || 0,
           image_url: eventMap.get(s.event_id)?.image_url,
         });
       }
@@ -263,6 +265,7 @@ export default function FinancePage() {
       revenue: e.revenue,
       orders: e.orders,
       tickets: e.tickets,
+      refunded: e.refunded || 0,
       image_url: e.image_url,
     })).sort((a, b) => b.revenue - a.revenue);
 
@@ -883,13 +886,14 @@ export default function FinancePage() {
                 <thead>
                   <tr>
                     <th>Evento</th>
-                    <th className="text-right">Boletos</th>
-                    <th className="text-right">Órdenes</th>
-                    <th className="text-right">Revenue</th>
-                    <th className="text-right">Comisión (15%)</th>
-                    <th className="text-right">Capacidad</th>
-                    <th className="text-right">Ocupación</th>
-                    <th className="text-right">% Rev</th>
+                    <th className="text-right" title="Total de boletos vendidos">Vendidos</th>
+                    <th className="text-right" title="Número de transacciones/compras completadas">Órdenes</th>
+                    <th className="text-right" title="Ingreso total bruto">Revenue</th>
+                    <th className="text-right" title="Boletos reembolsados (total o parcial)">Reembolsos</th>
+                    <th className="text-right" title="Comisión Dulos del 15% sobre revenue">Comisión (15%)</th>
+                    <th className="text-right" title="Capacidad total del recinto">Capacidad</th>
+                    <th className="text-right" title="Porcentaje de boletos vendidos vs capacidad total">Ocupación</th>
+                    <th className="text-right" title="Porcentaje del revenue total que representa este evento">% Rev</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -905,7 +909,7 @@ export default function FinancePage() {
                     const totalCap = eventSchedules.reduce((s, sc) => s + sc.capacity, 0);
                     const totalSold = eventSchedules.reduce((s, sc) => s + sc.sold, 0);
                     const occPct = totalCap > 0 ? Math.round((totalSold / totalCap) * 100) : 0;
-                    const occBadge = occPct > 80 ? { cls: 'bg-red-500', label: 'CRÍTICO' } : occPct >= 50 ? { cls: 'bg-yellow-500', label: 'ALTO' } : { cls: 'bg-green-500', label: 'NORMAL' };
+                    const occBadge = occPct === 0 ? { cls: 'bg-gray-400', label: 'SIN VENTAS' } : occPct > 80 ? { cls: 'bg-red-500', label: 'CRÍTICO' } : occPct >= 50 ? { cls: 'bg-yellow-500', label: 'ALTO' } : { cls: 'bg-green-500', label: 'NORMAL' };
                     return (
                       <React.Fragment key={event.event_id}>
                       <tr onClick={() => handleRevenueEventClick(event.event_id, event.event_ids)} className={`cursor-pointer ${isExpanded ? 'bg-red-50' : ''}`}>
@@ -931,6 +935,7 @@ export default function FinancePage() {
                         <td className="text-right">{event.tickets.toLocaleString()}</td>
                         <td className="text-right">{event.orders.toLocaleString()}</td>
                         <td className="text-right font-bold">{fmtCurrency(event.revenue)}</td>
+                        <td className="text-right">{event.refunded > 0 ? <span className="text-red-500 font-bold">{event.refunded}</span> : <span className="text-gray-300">0</span>}</td>
                         <td className="text-right font-bold text-[#EF4444]">{fmtCurrency(event.revenue * 0.15)}</td>
                         <td className="text-right text-gray-500">{totalCap > 0 ? totalCap.toLocaleString() : '—'}</td>
                         <td className="text-right">
@@ -943,7 +948,7 @@ export default function FinancePage() {
                       {/* Drill-down: Zone breakdown + Sections (Paolo) */}
                       {isExpanded && (
                         <tr>
-                          <td colSpan={8} className="bg-gray-50 p-4">
+                          <td colSpan={9} className="bg-gray-50 p-4">
                             <div className="space-y-3">
                               {/* Venue breakdown — always show which venue(s) */}
                               {event.venues && event.venues.length >= 1 && (
@@ -987,7 +992,7 @@ export default function FinancePage() {
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {expandedEventZones.map((z, i) => {
+                                      {expandedEventZones.filter(z => z.sold > 0 || z.available > 0).map((z, i) => {
                                         const cap = z.sold + z.available;
                                         const occPct = cap > 0 ? Math.round((z.sold / cap) * 100) : 0;
                                         return (
@@ -998,7 +1003,7 @@ export default function FinancePage() {
                                             <td className="text-right">{z.available}</td>
                                             <td className="text-right font-bold text-[#EF4444]">{fmtCurrency(z.sold * z.price)}</td>
                                             <td className="text-right">
-                                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${occPct >= 80 ? 'bg-red-500' : occPct >= 50 ? 'bg-yellow-500' : 'bg-green-500'}`}>
+                                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${occPct === 0 ? 'bg-gray-400' : occPct >= 80 ? 'bg-red-500' : occPct >= 50 ? 'bg-yellow-500' : 'bg-green-500'}`}>
                                                 {occPct}%
                                               </span>
                                             </td>
@@ -1041,7 +1046,7 @@ export default function FinancePage() {
                       </React.Fragment>
                     );
                   }) : (
-                    <tr><td colSpan={8} className="text-center py-4">No hay datos de eventos disponibles</td></tr>
+                    <tr><td colSpan={9} className="text-center py-4">No hay datos de eventos disponibles</td></tr>
                   )}
                   {eventRevenues.length > 1 && (() => {
                     const totalCap = schedulesDisplay.reduce((s, sc) => s + sc.capacity, 0);
@@ -1053,6 +1058,7 @@ export default function FinancePage() {
                       <td className="text-right">{eventRevenues.reduce((s, e) => s + e.tickets, 0).toLocaleString()}</td>
                       <td className="text-right">{eventRevenues.reduce((s, e) => s + e.orders, 0).toLocaleString()}</td>
                       <td className="text-right font-bold">{fmtCurrency(eventRevenues.reduce((s, e) => s + e.revenue, 0))}</td>
+                      <td className="text-right">{eventRevenues.reduce((s, e) => s + (e.refunded || 0), 0)}</td>
                       <td className="text-right font-bold">{fmtCurrency(eventRevenues.reduce((s, e) => s + e.revenue, 0) * 0.15)}</td>
                       <td className="text-right">{totalCap.toLocaleString()}</td>
                       <td className="text-right font-bold">{totalOcc}%</td>

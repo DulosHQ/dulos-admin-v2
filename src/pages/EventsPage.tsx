@@ -438,11 +438,14 @@ function ProjectModal({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Imagen URL</label>
-              <input type="text" value={form.imagen_url} onChange={e => setForm({ ...form, imagen_url: e.target.value })} placeholder="https://..." className={inputCls} />
+              <input type="text" value={form.imagen_url} onChange={e => setForm({ ...form, imagen_url: e.target.value })} placeholder="https://supabase.co/storage/v1/object/public/..." className={inputCls} />
+              {form.imagen_url && (
+                <img src={form.imagen_url} alt="Preview" className="mt-2 w-full max-h-32 object-cover rounded-lg border border-gray-200" onError={e => (e.currentTarget.style.display = 'none')} />
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-              <textarea value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} rows={2} className={inputCls} />
+              <textarea value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} rows={2} placeholder="Descripción del evento para los asistentes..." className={inputCls} />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
