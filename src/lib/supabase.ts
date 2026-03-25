@@ -430,9 +430,9 @@ export async function fetchOrders(): Promise<Order[]> {
 export async function fetchEscalations(): Promise<Escalation[]> {
   try {
     return await supabaseFetch<Escalation[]>('escalations?resolved=eq.false');
-  } catch (error) {
-    console.error('Error fetching escalations:', error);
-    throw error;
+  } catch {
+    // Table may not exist yet — silent fail
+    return [];
   }
 }
 
@@ -802,9 +802,8 @@ export async function fetchTicketRecovery(): Promise<TicketRecovery[]> {
 export async function fetchAllEscalations(): Promise<Escalation[]> {
   try {
     return await supabaseFetch<Escalation[]>('escalations?order=created_at.desc');
-  } catch (error) {
-    console.error('Error fetching all escalations:', error);
-    throw error;
+  } catch {
+    return [];
   }
 }
 
