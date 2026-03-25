@@ -5,8 +5,8 @@ import type { NextRequest } from "next/server";
 
 // Founders always have access regardless of team_members
 const FOUNDER_EMAILS = ["angel.lopez@vulkn-ai.com", "tamaravulkn@gmail.com", "paolo@dulos.io", "juan.sotelo@dulos.io"];
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://udjwabtyhjcrpyuffavz.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkandhYnR5aGpjcnB5dWZmYXZ6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzU5MzkzNCwiZXhwIjoyMDg5MTY5OTM0fQ.-1ABMJP5sYUyW1MDg2W7T8ZE3ipe5x_Lvmec9UdZkO8';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 async function isAuthorized(email: string): Promise<boolean> {
   if (FOUNDER_EMAILS.includes(email.toLowerCase())) return true;
