@@ -1414,7 +1414,7 @@ export default function EventsPage() {
                       </h3>
                       <p className="text-[10px] sm:text-xs text-gray-500 truncate">
                         {project.producer}
-                        {project.events[0]?.venue && <span className="text-gray-400"> · {project.events[0].venue}</span>}
+                        {project.events[0]?.venue && <span className="text-gray-400 truncate max-w-[200px] inline-block align-bottom"> · {project.events[0].venue}</span>}
                       </p>
                     </div>
                   </div>

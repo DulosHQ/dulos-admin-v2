@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Global: prevent horizontal body overflow on mobile */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 /* CLK/Cellosa Dashboard Design System — Compact Edition */
 
 /* Metric Cards - Cellosa style, tight */
@@ -30,6 +36,19 @@
 .data-table {
   @apply w-full text-sm;
   table-layout: auto;
+  min-width: 500px; /* Force scroll on mobile instead of squishing */
+}
+
+/* Ensure all data-table parents scroll horizontally */
+.data-table-wrap,
+.data-table:not([class*="overflow"]) {
+  /* Parent should have overflow-x-auto */
+}
+
+@media (max-width: 640px) {
+  .data-table {
+    min-width: 400px;
+  }
 }
 
 .data-table thead {

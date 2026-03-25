@@ -576,7 +576,7 @@ export default function SummaryPage() {
                     </div>
                     <p className="text-[11px] sm:text-[12px] text-gray-500 mt-0.5 truncate font-medium flex items-center gap-1">
                       <span className={`badge text-[9px] px-1 py-0 ${getEventTypeLabel(f.eventType).cls}`}>{getEventTypeLabel(f.eventType).text}</span>
-                      <span>{f.hora} · {f.sala}</span>
+                      <span className="truncate">{f.hora} · {f.sala}</span>
                     </p>
                     <div className="flex items-center justify-between mt-0.5">
                       <span className="text-[11px] sm:text-[12px] font-black text-[#EF4444]">{fmtCurrency(f.revenue)}</span>

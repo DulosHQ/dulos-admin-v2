@@ -1072,6 +1072,7 @@ export default function FinancePage() {
                               {event.venues && event.venues.length >= 1 && (
                                 <div>
                                   <p className="text-xs font-bold text-gray-500 uppercase mb-2">Por Recinto</p>
+                                  <div className="overflow-x-auto">
                                   <div className="overflow-x-auto"><table className="data-table text-xs">
                                     <thead>
                                       <tr>
@@ -1092,12 +1093,14 @@ export default function FinancePage() {
                                       ))}
                                     </tbody>
                                   </table></div>
+                                  </div>
                                 </div>
                               )}
                               {/* Zone revenue breakdown */}
                               {expandedEventZones.length > 0 && (
                                 <div>
                                   <p className="text-xs font-bold text-gray-500 uppercase mb-2">Desglose por Zona</p>
+                                  <div className="overflow-x-auto">
                                   <div className="overflow-x-auto"><table className="data-table text-xs">
                                     <thead>
                                       <tr>
@@ -1130,12 +1133,14 @@ export default function FinancePage() {
                                       })}
                                     </tbody>
                                   </table></div>
+                                  </div>
                                 </div>
                               )}
                               {/* Paolo's Event Sections (if event has reserved/hybrid seating) */}
                               {expandedEventSections.length > 0 && (
                                 <div>
                                   <p className="text-xs font-bold text-gray-500 uppercase mb-2">Secciones de Asientos (Paolo)</p>
+                                  <div className="overflow-x-auto">
                                   <div className="overflow-x-auto"><table className="data-table text-xs">
                                     <thead>
                                       <tr>
@@ -1152,6 +1157,7 @@ export default function FinancePage() {
                                       ))}
                                     </tbody>
                                   </table></div>
+                                  </div>
                                 </div>
                               )}
                               {expandedEventZones.length === 0 && expandedEventSections.length === 0 && (
