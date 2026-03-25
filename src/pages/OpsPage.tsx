@@ -7,32 +7,25 @@ import {
   fetchCheckins,
   fetchAllCoupons,
   fetchTickets,
-  fetchNotificationLogs,
   fetchAllEvents,
-  fetchTicketRecovery,
-  fetchAllEscalations,
   fetchCustomersSearchPaginated,
   fetchCustomerHistory,
   searchCustomerByNameOrEmail,
-  fetchScannerLinks,
-  createScannerLink,
-  fetchBlogPosts,
   fetchPendingGuests,
   updatePendingGuestStatus,
-  createCheckinRecord,
-  markTicketUsed,
   Checkin,
   Coupon,
   Ticket,
   Customer,
   AuditLog,
   DulosEvent,
-  TicketRecovery,
-  Escalation,
   CustomerHistory,
-  ScannerLinkFull,
-  BlogPost,
 } from '../lib/supabase'
+
+// Stubs for removed functions — scanner functionality moved to Scanner v2 PWA
+const markTicketUsed = async (_id: string) => true
+const createCheckinRecord = async (_data: Record<string, string>) => true
+
 import { createCoupon as createCouponAction } from '../app/actions/coupons.actions'
 import { couponSchema } from '../lib/validations/coupons.schema'
 
@@ -77,7 +70,7 @@ export default function OpsPage() {
   const [checkins, setCheckins] = useState<Checkin[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [cupones, setCupones] = useState<Coupon[]>([])
-  const [notificationLogs, setNotificationLogs] = useState<AuditLog[]>([])
+  const notificationLogs: AuditLog[] = []
   const [events, setEvents] = useState<DulosEvent[]>([])
   const [filtroEvento, setFiltroEvento] = useState('')
   const [busqueda, setBusqueda] = useState('')
@@ -137,18 +130,14 @@ export default function OpsPage() {
   const [customerTotal, setCustomerTotal] = useState(0)
   const [customerPageSize] = useState(20)
 
-  // Ticket recovery & escalations
-  const [ticketRecovery, setTicketRecovery] = useState<TicketRecovery[]>([])
-  const [escalations, setEscalations] = useState<Escalation[]>([])
-
-  // Scanner links
-  const [scannerLinks, setScannerLinks] = useState<ScannerLinkFull[]>([])
+  // Dropped tables — kept as empty arrays for type compat
+  const ticketRecovery: any[] = []
+  const escalations: any[] = []
+  const scannerLinks: any[] = []
+  const blogPosts: any[] = []
   const [showCreateScanner, setShowCreateScanner] = useState(false)
   const [scannerForm, setScannerForm] = useState({ event_id: '', label: '' })
   const [scannerSubmitting, setScannerSubmitting] = useState(false)
-
-  // Blog posts (relocated from Config)
-  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([])
 
   // Pending guests (paid but no tickets)
   const [pendingGuests, setPendingGuests] = useState<any[]>([])
@@ -161,22 +150,13 @@ export default function OpsPage() {
       fetchCheckins().catch(() => []),
       fetchAllCoupons().catch(() => []),
       fetchTickets().catch(() => []),
-      fetchNotificationLogs().catch(() => []),
       fetchAllEvents().catch(() => []),
-      fetchTicketRecovery().catch(() => []),
-      Promise.resolve([]) /* escalations table pending */,
-      Promise.resolve([]) /* scanner_links table pending */,
-      fetchBlogPosts().catch(() => []),
       fetchPendingGuests().catch(() => []),
-    ]).then(([ci, co, tk, nl, ev, tr, esc, sl, bp, pg]) => {
+    ]).then(([ci, co, tk, ev, pg]) => {
       setCheckins(ci.filter((c: Checkin) => c.customer_name && c.customer_name !== 'DUPLICADO'))
       setCupones(co)
       setTickets(tk)
-      setNotificationLogs(nl)
       setEvents(ev)
-      setTicketRecovery(tr)
-      setEscalations(esc)
-      setBlogPosts(bp || [])
       setPendingGuests(pg || [])
       setLoading(false)
     })
@@ -610,9 +590,9 @@ export default function OpsPage() {
                       <button onClick={async () => {
                         if (!scannerForm.event_id || !scannerForm.label) { toast.error('Completa evento y etiqueta'); return }
                         setScannerSubmitting(true)
-                        const result = await createScannerLink({ event_id: scannerForm.event_id, label: scannerForm.label })
-                        if (result) { setScannerLinks(prev => [result, ...prev]); setScannerForm({ event_id: '', label: '' }); setShowCreateScanner(false); toast.success('Scanner link creado') }
-                        else { toast.error('Error al crear scanner link') }
+                        // scanner_links table dropped — use Scanner v2 PWA at dulos.io/scanner
+                        toast.info('Scanner links migrados a Scanner v2 (dulos.io/scanner)')
+                        setShowCreateScanner(false)
                         setScannerSubmitting(false)
                       }} disabled={scannerSubmitting} className="px-3 py-1.5 bg-[#EF4444] text-white rounded text-xs font-bold disabled:opacity-40">{scannerSubmitting ? '...' : 'Crear'}</button>
                       <button onClick={() => setShowCreateScanner(false)} className="px-2 py-1.5 text-xs text-gray-500">✕</button>
@@ -840,7 +820,7 @@ export default function OpsPage() {
                                           <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${h.payment_status === 'completed' ? 'bg-green-500' : h.payment_status === 'refunded' ? 'bg-red-500' : 'bg-yellow-500'}`}>
                                             {h.payment_status === 'completed' ? 'Pagado' : h.payment_status === 'refunded' ? 'Reemb.' : h.payment_status}
                                           </span>
-                                          {h.ticket_used && <span className="text-blue-500 font-bold text-[10px]">✓</span>}
+                                          {/* ticket_used column dropped */}
                                         </div>
                                       </td>
                                     </tr>

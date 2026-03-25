@@ -9,18 +9,10 @@ import {
   fetchAuditLogsByAction,
   fetchDashboardStats,
   fetchVenues,
-  fetchNotifications,
-  fetchReminders,
-  fetchSurveys,
-  fetchBlogPosts,
   TeamMember,
   AuditLog,
   DashboardStats,
   Venue,
-  Notification,
-  Reminder,
-  Survey,
-  BlogPost,
 } from '../lib/supabase';
 
 const ACCENT = '#EF4444';
@@ -169,10 +161,11 @@ export default function AdminPage() {
 
   // Extra data
   const [venues, setVenues] = useState<Venue[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [surveys, setSurveys] = useState<Survey[]>([]);
-  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  // Dropped tables — empty arrays for type compat
+  const notifications: any[] = [];
+  const reminders: any[] = [];
+  const surveys: any[] = [];
+  const blogPosts: any[] = [];
 
   // Auditoría collapsed state
   const [auditExpanded, setAuditExpanded] = useState(false);
@@ -191,21 +184,13 @@ export default function AdminPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [teamData, auditData, statsData, venuesData, notifData, reminderData, surveyData, blogData] = await Promise.all([
+        const [teamData, auditData, statsData, venuesData] = await Promise.all([
           fetchTeam().catch(() => []),
           fetchAuditLogsByAction(logFilter).catch(() => []),
           fetchDashboardStats().catch(() => null),
           fetchVenues().catch(() => []),
-          Promise.resolve([]) /* notifications table pending */,
-          Promise.resolve([]) /* reminders table pending */,
-          Promise.resolve([]) /* surveys table pending */,
-          fetchBlogPosts().catch(() => []),
         ]);
         setVenues(venuesData);
-        setNotifications(notifData);
-        setReminders(reminderData);
-        setSurveys(surveyData);
-        setBlogPosts(blogData);
 
         setUsuarios(teamData.map((t) => ({
           id: t.id,

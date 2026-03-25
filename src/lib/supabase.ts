@@ -100,13 +100,16 @@ export interface Order {
   utm_campaign?: string;
   utm_content?: string;
   utm_term?: string;
-  device_type?: string;
-  browser?: string;
-  country?: string;
-  city?: string;
   referrer_url?: string;
+  discount_amount?: number;
+  subtotal?: number;
+  net_amount?: number;
+  stripe_fee?: number | null;
+  coupon_code?: string | null;
+  schedule_id?: string | null;
 }
 
+// Escalation table was dropped — interface kept for type compat
 export interface Escalation {
   id: string;
   client_id: string;
@@ -266,7 +269,6 @@ export interface CustomerHistory {
   quantity: number;
   total_price: number;
   payment_status: string;
-  ticket_used: boolean;
   event_date: string;
 }
 
@@ -366,6 +368,14 @@ export interface EventSectionSeat {
   venue_seat_id: string;
   status: string;
   created_at: string;
+}
+
+export interface EventCommission {
+  id: string;
+  event_id: string;
+  commission_rate: number;
+  created_at: string;
+  updated_at: string;
 }
 
 async function supabaseFetch<T>(endpoint: string): Promise<T> {
@@ -527,6 +537,14 @@ export async function fetchAllCoupons(): Promise<Coupon[]> {
   }
 }
 
+export async function fetchEventCommissions(): Promise<EventCommission[]> {
+  try {
+    return await supabaseFetch<EventCommission[]>('event_commissions');
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchSalesSummary(): Promise<SalesSummary[]> {
   try {
     return await supabaseFetch<SalesSummary[]>('v_sales_summary');
@@ -566,25 +584,26 @@ export async function fetchRecentTickets(limit = 50): Promise<Ticket[]> {
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
   try {
-    const [events, salesSummary, zones] = await Promise.all([
-      fetchEvents(),
-      fetchSalesSummary(),
-      fetchZones(),
-    ]);
-
-    const totalRevenue = salesSummary.reduce((sum, s) => sum + s.total_revenue, 0);
-    const totalTickets = salesSummary.reduce((sum, s) => sum + s.total_tickets_sold, 0);
-    const totalEvents = events.length;
-
-    const totalSold = zones.reduce((sum, zone) => sum + zone.sold, 0);
-    const totalAvailable = zones.reduce((sum, zone) => sum + zone.available + zone.sold, 0);
-    const occupancyRate = totalAvailable > 0 ? (totalSold / totalAvailable) * 100 : 0;
-
+    const [events, zones] = await Promise.all([fetchEvents(), fetchZones()]);
+    let totalRevenue = 0, totalTickets = 0;
+    try {
+      const salesSummary = await fetchSalesSummary();
+      totalRevenue = salesSummary.reduce((sum, s) => sum + s.total_revenue, 0);
+      totalTickets = salesSummary.reduce((sum, s) => sum + s.total_tickets_sold, 0);
+    } catch {
+      // Fallback: calculate from orders directly if view doesn't exist
+      const orders = await fetchAllOrders();
+      const completed = orders.filter(o => o.payment_status === 'completed');
+      totalRevenue = completed.reduce((sum, o) => sum + o.total_price, 0);
+      totalTickets = completed.reduce((sum, o) => sum + o.quantity, 0);
+    }
+    const totalSold = zones.reduce((sum, z) => sum + z.sold, 0);
+    const totalAvailable = zones.reduce((sum, z) => sum + z.available + z.sold, 0);
     return {
       totalRevenue,
       totalTickets,
-      totalEvents,
-      occupancyRate,
+      totalEvents: events.length,
+      occupancyRate: totalAvailable > 0 ? (totalSold / totalAvailable) * 100 : 0,
     };
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);
@@ -639,17 +658,20 @@ export async function searchCustomerByNameOrEmail(query: string): Promise<Custom
 
 export async function fetchRevenueByEvent(): Promise<{ event_id: string; event_name: string; revenue: number; image_url?: string }[]> {
   try {
-    const [events, zones] = await Promise.all([
+    const [events, orders] = await Promise.all([
       fetchAllEvents(),
-      fetchZones(),
+      fetchAllOrders(),
     ]);
 
     const eventMap = new Map(events.map(e => [e.id, e]));
     const revenueByEvent = new Map<string, number>();
 
-    zones.forEach(zone => {
-      const current = revenueByEvent.get(zone.event_id) || 0;
-      revenueByEvent.set(zone.event_id, current + (zone.sold * zone.price));
+    // Revenue from completed orders (not zones.sold * zones.price which underestimates)
+    orders.forEach(order => {
+      if (order.payment_status === 'completed') {
+        const current = revenueByEvent.get(order.event_id) || 0;
+        revenueByEvent.set(order.event_id, current + order.total_price);
+      }
     });
 
     return Array.from(revenueByEvent.entries())

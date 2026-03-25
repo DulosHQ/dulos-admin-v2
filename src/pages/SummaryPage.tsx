@@ -10,7 +10,6 @@ import {
   fetchZones,
   fetchRecentOrders,
   fetchCheckins,
-  fetchEscalations,
   fetchRecentTickets,
   fetchSchedules,
   fetchSalesSummary,
@@ -21,7 +20,6 @@ import {
   TicketZone,
   Order,
   Checkin,
-  Escalation,
   Ticket,
   Schedule,
   Venue,
@@ -171,12 +169,11 @@ export default function SummaryPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [events, zones, orders, checkins, escalations, tickets, schedules, venues, salesData] = await Promise.all([
+        const [events, zones, orders, checkins, tickets, schedules, venues, salesData] = await Promise.all([
           fetchAllEvents().catch(() => [] as DulosEvent[]),
           fetchZones().catch(() => [] as TicketZone[]),
           fetchRecentOrders(100).catch(() => [] as Order[]),
           fetchCheckins().catch(() => [] as Checkin[]),
-          Promise.resolve([]) as Promise<Escalation[]> /* table pending */,
           fetchRecentTickets(100).catch(() => [] as Ticket[]),
           fetchSchedules().catch(() => [] as Schedule[]),
           getVenueMap().catch(() => new Map<string, Venue>()),
@@ -260,18 +257,7 @@ export default function SummaryPage() {
           }
         });
 
-        // Escalations
-        escalations.forEach((esc, idx) => {
-          newAlertas.push({
-            id: `e-${idx}`,
-            tipo: 'critico',
-            mensaje: `${esc.reason} - ${esc.event_mentioned}`,
-            eventName: esc.event_mentioned,
-            imageUrl: '',
-            issue: esc.situation || esc.reason,
-            suggestion: 'Revisar y resolver escalación',
-          });
-        });
+        // Escalations table dropped — alerts from zones/schedules only
 
         setAlertas(newAlertas.slice(0, 8));
 

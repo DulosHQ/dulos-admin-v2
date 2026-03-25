@@ -18,7 +18,7 @@ import {
   fetchSalesSummary,
   fetchTransactionsPaginated,
   fetchEventSections,
-  fetchDispersions,
+  fetchEventCommissions,
   DulosEvent,
   TicketZone,
   Ticket,
@@ -26,7 +26,7 @@ import {
   Schedule,
   SalesSummary,
   EventSection,
-  DispersionFull,
+  EventCommission,
 } from '../lib/supabase';
 
 type TabKey = 'ingresos' | 'tendencias' | 'transacciones' | 'comisiones';
@@ -152,7 +152,7 @@ export default function FinancePage() {
   const [salesSummary, setSalesSummary] = useState<SalesSummary[]>([]);
   const [rawOrders, setRawOrders] = useState<Order[]>([]);
   const [pedidosData] = useState<{ headers: string[]; rows: any[]; totalRows: number }>({ headers: [], rows: [], totalRows: 0 });
-  const [dispersions, setDispersions] = useState<DispersionFull[]>([]);
+  const [commissions, setCommissions] = useState<EventCommission[]>([]);
 
   // UI state
   const [expandedCapacity, setExpandedCapacity] = useState<number | null>(null);
@@ -173,7 +173,7 @@ export default function FinancePage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [zones, ordersData, schedulesData, eventsData, tickets, revenueByEvent, salesSummaryData, dispersionsData] = await Promise.all([
+        const [zones, ordersData, schedulesData, eventsData, tickets, revenueByEvent, salesSummaryData, commissionsData] = await Promise.all([
           fetchZones().catch(() => [] as TicketZone[]),
           fetchAllOrders().catch(() => []),
           fetchSchedules().catch(() => [] as Schedule[]),
@@ -181,7 +181,7 @@ export default function FinancePage() {
           fetchTickets().catch(() => [] as Ticket[]),
           fetchRevenueByEvent().catch(() => []),
           fetchSalesSummary().catch(() => [] as SalesSummary[]),
-          Promise.resolve([]) as Promise<DispersionFull[]> /* dispersions table pending */,
+          fetchEventCommissions().catch(() => [] as EventCommission[]),
         ]);
         setRawZones(zones);
         setRawTickets(tickets);
@@ -190,7 +190,7 @@ export default function FinancePage() {
         setRawEventRevenues(revenueByEvent);
         setSalesSummary(salesSummaryData);
         setRawOrders(ordersData);
-        setDispersions(dispersionsData);
+        setCommissions(commissionsData);
       } catch (error) {
         console.error('Error loading finance data:', error);
       } finally {
@@ -541,18 +541,19 @@ export default function FinancePage() {
       existing.revenue += o.total_price || 0;
       utmSourceMap.set(source, existing);
 
-      const device = o.device_type || 'Desconocido';
+      // device_type, city, country, browser columns were dropped — use utm_source as proxy
+      const device = (o as any).device_type || 'Desconocido';
       deviceMap.set(device, (deviceMap.get(device) || 0) + 1);
 
-      // Geo
-      const city = o.city || 'Desconocida';
+      // Geo — columns dropped, skip
+      const city = (o as any).city || 'Desconocida';
       const cityData = cityMap.get(city) || { count: 0, revenue: 0 };
       cityData.count++;
       cityData.revenue += o.total_price || 0;
       cityMap.set(city, cityData);
 
-      // Browser
-      const browser = o.browser || 'Desconocido';
+      // Browser — column dropped
+      const browser = (o as any).browser || 'Desconocido';
       browserMap.set(browser, (browserMap.get(browser) || 0) + 1);
     });
     const utmSources = Array.from(utmSourceMap.entries())
@@ -571,43 +572,42 @@ export default function FinancePage() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    // --- Commission calculations — real dispersions if available, fallback 15% ---
-    const hasRealDispersions = dispersions.length > 0;
+    // --- Commission calculations — from event_commissions table, fallback 15% ---
+    // Commission formula: net_sales = total_price - discount, commission = net_sales × rate
+    const commissionMap = new Map(commissions.map(c => [c.event_id, c.commission_rate]));
     const totalComissionRevenue = filteredSalesSummary.reduce((sum, s) => sum + s.total_revenue, 0);
 
-    let dulosCommission: number;
-    let producerShare: number;
-    let realDispersions: DispersionFull[] = [];
+    // Calculate per-event with real rates
+    const eventCommData = Array.from(eventAggMap.values()).map(e => {
+      const eventId = e.event_ids[0];
+      const rate = commissionMap.get(eventId) ?? 0.15; // Default 15% if not in table
+      // Use net revenue (total - discounts) for commission base
+      const eventOrders = filteredOrders.filter(o => o.event_id === eventId && o.payment_status === 'completed');
+      const netRevenue = eventOrders.reduce((sum, o) => sum + (o.net_amount ?? o.total_price), 0);
+      const commission = netRevenue * rate;
+      return {
+        event_id: eventId,
+        event_name: e.event_name,
+        revenue: e.revenue,
+        commission,
+        producer: netRevenue - commission,
+        tickets: e.tickets,
+        image_url: e.image_url,
+        rate,
+        dispersion: null as any,
+      };
+    }).sort((a, b) => b.revenue - a.revenue);
 
-    if (hasRealDispersions) {
-      const filteredDisp = selectedEvent ? dispersions.filter(d => d.event_id === selectedEvent) : dispersions;
-      realDispersions = filteredDisp;
-      dulosCommission = filteredDisp.reduce((s, d) => s + d.platform_fee, 0);
-      producerShare = filteredDisp.reduce((s, d) => s + d.net_payout, 0);
-    } else {
-      dulosCommission = totalComissionRevenue * 0.15;
-      producerShare = totalComissionRevenue * 0.85;
-    }
+    const dulosCommission = eventCommData.reduce((sum, e) => sum + e.commission, 0);
+    const producerShare = eventCommData.reduce((sum, e) => sum + e.producer, 0);
 
     const commissionData = {
       totalRevenue: totalComissionRevenue,
       dulosCommission,
       producerShare,
-      hasRealDispersions,
-      realDispersions,
-      events: Array.from(eventAggMap.values()).map(e => {
-        const disp = dispersions.find(d => d.event_id === e.event_ids[0]);
-        return {
-          event_id: e.event_ids[0],
-          event_name: e.event_name,
-          revenue: e.revenue,
-          commission: disp ? disp.platform_fee : e.revenue * 0.15,
-          producer: disp ? disp.net_payout : e.revenue * 0.85,
-          tickets: e.tickets,
-          image_url: e.image_url,
-          dispersion: disp || null,
-        };
-      }).sort((a, b) => b.revenue - a.revenue)
+      hasRealDispersions: commissions.length > 0,
+      realDispersions: [] as any[],
+      events: eventCommData,
     };
 
     // --- Transactions from pedidos data (REAL DATA) ---
@@ -668,7 +668,7 @@ export default function FinancePage() {
       cityBreakdown,
       browserBreakdown,
     };
-  }, [loading, events, rawZones, rawTickets, rawSchedules, rawEventRevenues, salesSummary, rawOrders, pedidosData, selectedEvent, dateRange, customDateFrom, customDateTo, dispersions]);
+  }, [loading, events, rawZones, rawTickets, rawSchedules, rawEventRevenues, salesSummary, rawOrders, pedidosData, selectedEvent, dateRange, customDateFrom, customDateTo, commissions]);
 
   // Handle revenue event drill-down
   const handleRevenueEventClick = async (eventId: string, eventIds?: string[]) => {
@@ -1318,8 +1318,8 @@ export default function FinancePage() {
             const geoFilteredOrders = selectedEvent ? rawOrders.filter(o => o.event_id === selectedEvent) : rawOrders;
             const geoMap = new Map<string, { count: number; revenue: number }>();
             geoFilteredOrders.forEach(o => {
-              if (!o.city && !o.country) return; // skip unknown geo
-              const key = `${o.city || '?'}, ${o.country || '?'}`;
+              if (!(o as any).city && !(o as any).country) return; // skip unknown geo (columns dropped)
+              const key = `${(o as any).city || '?'}, ${(o as any).country || '?'}`;
               const existing = geoMap.get(key) || { count: 0, revenue: 0 };
               existing.count++;
               existing.revenue += o.total_price || 0;
@@ -1486,149 +1486,79 @@ export default function FinancePage() {
       {/* ====== COMISIONES TAB ====== */}
       {activeTab === 'comisiones' && (
         <div className="space-y-4 animate-fade-in">
-          {dispersions.length > 0 ? (() => {
-            const filtDisp = selectedEvent ? dispersions.filter(d => d.event_id === selectedEvent) : dispersions;
-            const totGross = filtDisp.reduce((s, d) => s + (d.gross_revenue || 0), 0);
-            const totFee = filtDisp.reduce((s, d) => s + (d.platform_fee || 0), 0);
-            const totPayout = filtDisp.reduce((s, d) => s + (d.net_payout || 0), 0);
-            const totRefunds = filtDisp.reduce((s, d) => s + (d.refunds || 0), 0);
-            const totAdSpend = filtDisp.reduce((s, d) => s + (d.ad_spend || 0), 0);
-            return (<>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                <div className="bg-white rounded-lg border border-gray-200 p-2 text-center">
-                  <p className="text-[9px] text-gray-500 uppercase">Bruto</p>
-                  <p className="text-sm font-extrabold">{fmtCurrency(totGross)}</p>
-                </div>
-                <div className="bg-white rounded-lg border border-gray-200 p-2 text-center">
-                  <p className="text-[9px] text-gray-500 uppercase">Comisión</p>
-                  <p className="text-sm font-extrabold text-[#EF4444]">{fmtCurrency(totFee)}</p>
-                </div>
-                <div className="bg-white rounded-lg border border-gray-200 p-2 text-center">
-                  <p className="text-[9px] text-gray-500 uppercase">Payout</p>
-                  <p className="text-sm font-extrabold text-emerald-600">{fmtCurrency(totPayout)}</p>
-                </div>
-                <div className="bg-white rounded-lg border border-gray-200 p-2 text-center hidden sm:block">
-                  <p className="text-[9px] text-gray-500 uppercase">Reembolsos</p>
-                  <p className="text-sm font-extrabold text-orange-500">{fmtCurrency(totRefunds)}</p>
-                </div>
-                <div className="bg-white rounded-lg border border-gray-200 p-2 text-center hidden sm:block">
-                  <p className="text-[9px] text-gray-500 uppercase">Ad Spend</p>
-                  <p className="text-sm font-extrabold text-blue-500">{fmtCurrency(totAdSpend)}</p>
-                </div>
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
+              <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase">Ingresos netos</p>
+              <p className="text-sm sm:text-lg font-extrabold">{fmtCurrency(commissionData.totalRevenue)}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
+              <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase">Comisión Dulos</p>
+              <p className="text-sm sm:text-lg font-extrabold text-[#EF4444]">{fmtCurrency(commissionData.dulosCommission)}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
+              <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase">Pago productor</p>
+              <p className="text-sm sm:text-lg font-extrabold text-emerald-600">{fmtCurrency(commissionData.producerShare)}</p>
+            </div>
+          </div>
+          {/* Visual distribution bar */}
+          {commissionData.totalRevenue > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 p-3">
+              <div className="flex h-4 rounded-full overflow-hidden">
+                <div className="bg-[#EF4444] transition-all" style={{ width: `${Math.round((commissionData.dulosCommission / commissionData.totalRevenue) * 100)}%` }} />
+                <div className="bg-emerald-500 transition-all" style={{ width: `${Math.round((commissionData.producerShare / commissionData.totalRevenue) * 100)}%` }} />
               </div>
-              <div className="section-card">
-                <div className="section-card-header">
-                  <span className="section-card-title">Dispersiones</span>
-                  <span className="ml-auto text-xs text-gray-400">{filtDisp.length} registros</span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="data-table text-xs">
-                    <thead>
-                      <tr>
-                        <th>Periodo</th>
-                        <th className="text-right">Bruto</th>
-                        <th className="text-right hidden sm:table-cell">Descuentos</th>
-                        <th className="text-right hidden sm:table-cell">Reembolsos</th>
-                        <th className="text-right">Comisión</th>
-                        <th className="text-right">Net Payout</th>
-                        <th>Estado</th>
-                        <th className="hidden sm:table-cell">Ref. Pago</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filtDisp.map(d => (
-                        <tr key={d.id}>
-                          <td className="whitespace-nowrap">
-                            {d.period_start ? new Date(d.period_start).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : '—'}
-                            {' – '}
-                            {d.period_end ? new Date(d.period_end).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : '—'}
-                          </td>
-                          <td className="text-right font-bold">{fmtCurrency(d.gross_revenue || 0)}</td>
-                          <td className="text-right hidden sm:table-cell">{fmtCurrency(d.discounts || 0)}</td>
-                          <td className="text-right hidden sm:table-cell">{fmtCurrency(d.refunds || 0)}</td>
-                          <td className="text-right font-bold text-[#EF4444]">{fmtCurrency(d.platform_fee || 0)}</td>
-                          <td className="text-right font-bold text-emerald-600">{fmtCurrency(d.net_payout || 0)}</td>
-                          <td>
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${d.status === 'paid' ? 'bg-green-500' : d.status === 'cancelled' ? 'bg-red-500' : 'bg-yellow-500'}`}>
-                              {d.status === 'paid' ? 'Pagado' : d.status === 'cancelled' ? 'Cancelado' : 'Pendiente'}
-                            </span>
-                          </td>
-                          <td className="hidden sm:table-cell text-gray-400 truncate max-w-[100px]">{d.payment_reference || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              <div className="flex justify-between mt-1.5 text-[10px] font-bold">
+                <span className="text-[#EF4444]">Dulos {commissionData.totalRevenue > 0 ? Math.round((commissionData.dulosCommission / commissionData.totalRevenue) * 100) : 0}%</span>
+                <span className="text-emerald-600">Productor {commissionData.totalRevenue > 0 ? Math.round((commissionData.producerShare / commissionData.totalRevenue) * 100) : 0}%</span>
               </div>
-            </>);
-          })() : (
-            <>
-              <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
-                  <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase">Ingresos brutos</p>
-                  <p className="text-sm sm:text-lg font-extrabold">{fmtCurrency(commissionData.totalRevenue)}</p>
-                </div>
-                <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
-                  <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase">Comisión (15%)</p>
-                  <p className="text-sm sm:text-lg font-extrabold text-[#EF4444]">{fmtCurrency(commissionData.dulosCommission)}</p>
-                </div>
-                <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 text-center">
-                  <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase">Productor (85%)</p>
-                  <p className="text-sm sm:text-lg font-extrabold text-emerald-600">{fmtCurrency(commissionData.producerShare)}</p>
-                </div>
-              </div>
-              {/* Visual distribution bar */}
-              <div className="bg-white rounded-lg border border-gray-200 p-3">
-                <div className="flex h-4 rounded-full overflow-hidden">
-                  <div className="bg-[#EF4444] transition-all" style={{ width: '15%' }} />
-                  <div className="bg-emerald-500 transition-all" style={{ width: '85%' }} />
-                </div>
-                <div className="flex justify-between mt-1.5 text-[10px] font-bold">
-                  <span className="text-[#EF4444]">Dulos 15%</span>
-                  <span className="text-emerald-600">Productor 85%</span>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Evento</th>
-                      <th className="text-right" title="Total de boletos vendidos">Vendidos</th>
-                      <th className="text-right">Ingresos</th>
-                      <th className="text-right text-[#EF4444]">Dulos (15%)</th>
-                      <th className="text-right text-emerald-600">Productor (85%)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {commissionData.events.map(event => (
-                      <tr key={event.event_id}>
-                        <td>
-                          <div className="flex items-center gap-2">
-                            {event.image_url && <img src={event.image_url} alt={event.event_name} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
-                            <span className="font-bold">{event.event_name}</span>
-                          </div>
-                        </td>
-                        <td className="text-right">{event.tickets.toLocaleString()}</td>
-                        <td className="text-right font-bold">{fmtCurrency(event.revenue)}</td>
-                        <td className="text-right font-bold text-[#EF4444]">{fmtCurrency(event.commission)}</td>
-                        <td className="text-right font-bold text-emerald-600">{fmtCurrency(event.producer)}</td>
-                      </tr>
-                    ))}
-                    {commissionData.events.length > 1 && (
-                      <tr className="total-row">
-                        <td className="font-bold">Total</td>
-                        <td className="text-right">{commissionData.events.reduce((s, e) => s + e.tickets, 0).toLocaleString()}</td>
-                        <td className="text-right font-bold">{fmtCurrency(commissionData.totalRevenue)}</td>
-                        <td className="text-right font-bold">{fmtCurrency(commissionData.dulosCommission)}</td>
-                        <td className="text-right font-bold">{fmtCurrency(commissionData.producerShare)}</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-[10px] text-gray-400 text-center">⚠️ Cálculo estimado (15%). Las dispersiones reales aparecerán cuando se registren.</p>
-            </>
+            </div>
           )}
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Evento</th>
+                  <th className="text-right">Tasa</th>
+                  <th className="text-right" title="Total de boletos vendidos">Vendidos</th>
+                  <th className="text-right">Ingresos</th>
+                  <th className="text-right text-[#EF4444]">Comisión</th>
+                  <th className="text-right text-emerald-600">Productor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {commissionData.events.map(event => (
+                  <tr key={event.event_id}>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        {event.image_url && <img src={event.image_url} alt={event.event_name} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
+                        <span className="font-bold">{event.event_name}</span>
+                      </div>
+                    </td>
+                    <td className="text-right text-xs text-gray-500">{((event as any).rate * 100).toFixed(0)}%</td>
+                    <td className="text-right">{event.tickets.toLocaleString()}</td>
+                    <td className="text-right font-bold">{fmtCurrency(event.revenue)}</td>
+                    <td className="text-right font-bold text-[#EF4444]">{fmtCurrency(event.commission)}</td>
+                    <td className="text-right font-bold text-emerald-600">{fmtCurrency(event.producer)}</td>
+                  </tr>
+                ))}
+                {commissionData.events.length > 1 && (
+                  <tr className="total-row">
+                    <td className="font-bold">Total</td>
+                    <td></td>
+                    <td className="text-right">{commissionData.events.reduce((s, e) => s + e.tickets, 0).toLocaleString()}</td>
+                    <td className="text-right font-bold">{fmtCurrency(commissionData.totalRevenue)}</td>
+                    <td className="text-right font-bold">{fmtCurrency(commissionData.dulosCommission)}</td>
+                    <td className="text-right font-bold">{fmtCurrency(commissionData.producerShare)}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[10px] text-gray-400 text-center">
+            {commissions.length > 0
+              ? 'Tasas de comisión por evento desde event_commissions. Fórmula: comisión = ventas_netas × tasa.'
+              : '⚠️ Sin tasas configuradas — usando 15% por defecto. Configura event_commissions para tasas reales.'}
+          </p>
         </div>
       )}
     </div>
