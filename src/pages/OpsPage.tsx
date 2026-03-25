@@ -115,8 +115,9 @@ export default function OpsPage() {
   const [showCouponModal, setShowCouponModal] = useState(false)
   const [couponForm, setCouponForm] = useState({
     code: '',
-    discount_type: 'percentage',
-    discount_value: '',
+    type: 'percentage',
+    discount_amount: '',
+    discount_percent: '',
     event_id: '',
     max_uses: '',
     valid_until: '',
@@ -339,11 +340,12 @@ export default function OpsPage() {
   }
 
   const handleCreateCoupon = async () => {
-    // Validate with Zod
+    const isPercent = couponForm.type === 'percentage';
     const parsed = couponSchema.safeParse({
       code: couponForm.code,
-      discount_type: couponForm.discount_type,
-      discount_value: Number(couponForm.discount_value) || 0,
+      type: couponForm.type,
+      discount_amount: !isPercent ? (Number(couponForm.discount_amount) || 0) : undefined,
+      discount_percent: isPercent ? (Number(couponForm.discount_percent) || 0) : undefined,
       event_id: couponForm.event_id || undefined,
       max_uses: couponForm.max_uses ? Number(couponForm.max_uses) : undefined,
       valid_until: couponForm.valid_until || undefined,
@@ -364,9 +366,10 @@ export default function OpsPage() {
         const newCoupon: Coupon = {
           id: result.data?.id || crypto.randomUUID(),
           code: parsed.data.code,
-          discount_type: parsed.data.discount_type,
-          discount_value: parsed.data.discount_value,
-          used_count: 0,
+          type: parsed.data.type,
+          discount_amount: parsed.data.discount_amount || null,
+          discount_percent: parsed.data.discount_percent || null,
+          uses_count: 0,
           max_uses: parsed.data.max_uses || undefined,
           is_active: true,
           event_id: parsed.data.event_id || undefined,
@@ -375,7 +378,7 @@ export default function OpsPage() {
         }
         setCupones(prev => [newCoupon, ...prev])
         setShowCouponModal(false)
-        setCouponForm({ code: '', discount_type: 'percentage', discount_value: '', event_id: '', max_uses: '', valid_until: '' })
+        setCouponForm({ code: '', type: 'percentage', discount_amount: '', discount_percent: '', event_id: '', max_uses: '', valid_until: '' })
         toast.success('Cupón creado exitosamente')
       } else {
         toast.error(result.error || 'Error al crear el cupón')
@@ -936,9 +939,9 @@ export default function OpsPage() {
                   </thead>
                   <tbody>
                 {cupones.map(c => {
-                  const discountVal = c.discount_value || 0
-                  const usedCount = c.used_count || 0
-                  const discType = c.discount_type || 'flat'
+                  const usedCount = c.uses_count || 0
+                  const discType = c.type || 'fixed'
+                  const discountVal = discType === 'percentage' ? (c.discount_percent || 0) : (c.discount_amount || 0)
                   const discLabel = discType === 'percentage' ? `${discountVal}%` : fmtCurrency(discountVal)
 
                   return (
@@ -1082,8 +1085,8 @@ export default function OpsPage() {
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Tipo de descuento</label>
                 <select
-                  value={couponForm.discount_type}
-                  onChange={e => setCouponForm({ ...couponForm, discount_type: e.target.value })}
+                  value={couponForm.type}
+                  onChange={e => setCouponForm({ ...couponForm, type: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
                 >
                   <option value="percentage">Porcentaje</option>
@@ -1091,12 +1094,12 @@ export default function OpsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Valor</label>
+                <label className="block text-xs font-bold text-gray-600 mb-1">{couponForm.type === 'percentage' ? 'Porcentaje (%)' : 'Monto ($)'}</label>
                 <input
                   type="number"
-                  value={couponForm.discount_value}
-                  onChange={e => setCouponForm({ ...couponForm, discount_value: e.target.value })}
-                  placeholder={couponForm.discount_type === 'percentage' ? '15' : '100'}
+                  value={couponForm.type === 'percentage' ? couponForm.discount_percent : couponForm.discount_amount}
+                  onChange={e => setCouponForm({ ...couponForm, [couponForm.type === 'percentage' ? 'discount_percent' : 'discount_amount']: e.target.value })}
+                  placeholder={couponForm.type === 'percentage' ? '15' : '100'}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
                 />
               </div>
@@ -1140,7 +1143,7 @@ export default function OpsPage() {
               </button>
               <button
                 onClick={handleCreateCoupon}
-                disabled={!couponForm.code || !couponForm.discount_value || couponSubmitting}
+                disabled={!couponForm.code || (couponForm.type === 'percentage' ? !couponForm.discount_percent : !couponForm.discount_amount) || couponSubmitting}
                 className="px-4 py-2 text-white rounded-lg text-sm font-bold disabled:opacity-40 flex items-center gap-2"
                 style={{ backgroundColor: ACCENT }}
               >

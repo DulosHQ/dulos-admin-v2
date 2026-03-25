@@ -175,15 +175,22 @@ export interface Ticket {
 export interface Coupon {
   id: string;
   code: string;
-  discount_type: string;
-  discount_value: number;
-  used_count: number;
+  type: string;                    // DB: 'percentage' | 'fixed'
+  discount_amount: number | null;  // for fixed discounts
+  discount_percent: number | null; // for percentage discounts
+  uses_count: number;
   max_uses?: number;
+  max_uses_per_customer?: number;
+  min_tickets?: number;
   is_active: boolean;
+  is_public?: boolean;
   valid_from?: string;
   valid_until?: string;
   event_id?: string;
+  zone_id?: string;
+  zone_name?: string;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Checkin {

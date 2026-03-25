@@ -4,11 +4,11 @@ import { eventSchema, type EventFormData } from '@/lib/validations/events.schema
 import { logAction } from './audit.actions';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkandhYnR5aGpjcnB5dWZmYXZ6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzU5MzkzNCwiZXhwIjoyMDg5MTY5OTM0fQ.-1ABMJP5sYUyW1MDg2W7T8ZE3ipe5x_Lvmec9UdZkO8';
 
 const headers = {
-  'apikey': SUPABASE_ANON_KEY,
-  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+  'apikey': SUPABASE_SERVICE_KEY,
+  'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
   'Content-Type': 'application/json',
   'Prefer': 'return=representation',
 };
@@ -40,12 +40,9 @@ export async function createEvent(formData: EventFormData) {
   try {
     const body = {
       name: parsed.data.name,
-      venue: '',
-      city: '',
-      dates: '',
       status: parsed.data.status,
       image_url: parsed.data.image_url || '',
-      buy_url: '',
+      description: parsed.data.description || '',
     };
     const res = await fetch(`${SUPABASE_URL}/rest/v1/events`, {
       method: 'POST',
