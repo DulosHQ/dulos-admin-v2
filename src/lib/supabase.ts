@@ -1023,3 +1023,72 @@ export async function fetchBlogPosts(): Promise<BlogPost[]> {
     return [];
   }
 }
+
+// ─── Pending Guest Status Management ───
+
+export async function updatePendingGuestStatus(id: string, status: string, notes?: string, resolvedBy?: string): Promise<boolean> {
+  try {
+    // First fetch current data to preserve guests array
+    const current = await supabaseFetch<any[]>(`pending_guests?id=eq.${id}`);
+    if (!current.length) return false;
+    const guests = current[0].guests || [];
+    // Update first guest's metadata
+    if (guests[0]) {
+      guests[0]._status = status;
+      if (notes !== undefined) guests[0]._notes = notes;
+      if (resolvedBy) guests[0]._resolved_by = resolvedBy;
+      if (status === 'resolved') guests[0]._resolved_at = new Date().toISOString();
+    }
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/pending_guests?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Prefer': 'return=representation' },
+      body: JSON.stringify({ guests }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ─── Check-in (QR Scan → Supabase) ───
+
+export async function createCheckinRecord(data: {
+  ticket_id: string;
+  ticket_number: string;
+  customer_name: string;
+  event_name: string;
+  venue: string;
+  operator_name: string;
+}): Promise<boolean> {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/checkins`, {
+      method: 'POST',
+      headers: { ...headers, 'Prefer': 'return=representation' },
+      body: JSON.stringify({
+        ...data,
+        status: 'ok',
+        scanned_at: new Date().toISOString(),
+      }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function markTicketUsed(ticketId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/tickets?id=eq.${ticketId}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Prefer': 'return=representation' },
+      body: JSON.stringify({
+        status: 'used',
+        used_at: new Date().toISOString(),
+        checked_in_at: new Date().toISOString(),
+      }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}

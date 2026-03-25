@@ -18,6 +18,9 @@ import {
   createScannerLink,
   fetchBlogPosts,
   fetchPendingGuests,
+  updatePendingGuestStatus,
+  createCheckinRecord,
+  markTicketUsed,
   Checkin,
   Coupon,
   Ticket,
@@ -148,6 +151,9 @@ export default function OpsPage() {
 
   // Pending guests (paid but no tickets)
   const [pendingGuests, setPendingGuests] = useState<any[]>([])
+  const [pendingStatusFilter, setPendingStatusFilter] = useState<'all' | 'pending' | 'resolved'>('pending')
+  const [editingPendingId, setEditingPendingId] = useState<string | null>(null)
+  const [pendingNotes, setPendingNotes] = useState<Record<string, string>>({})
 
   useEffect(() => {
     Promise.all([
@@ -267,8 +273,20 @@ export default function OpsPage() {
             } else if (ticket.status === 'cancelled') {
               setScanResult({ ok: false, msg: `Boleto cancelado — ${ticket.ticket_number}` })
             } else {
+              // Write check-in to Supabase
+              const event = events.find(e => e.id === ticket.event_id)
+              markTicketUsed(ticket.id)
+              createCheckinRecord({
+                ticket_id: ticket.id,
+                ticket_number: ticket.ticket_number,
+                customer_name: ticket.customer_name || 'Sin nombre',
+                event_name: event?.name || '',
+                venue: event?.name || '',
+                operator_name: 'QR Scanner',
+              })
+              ticket.status = 'used' // Update local state
               setScanResult({ ok: true, msg: `✓ ${ticket.customer_name || 'Cliente'} — ${ticket.ticket_number}` })
-              toast.success(`Check-in: ${ticket.customer_name || ticket.ticket_number}`)
+              toast.success(`Check-in registrado: ${ticket.customer_name || ticket.ticket_number}`)
             }
           } else {
             setScanResult({ ok: false, msg: `Boleto no encontrado: ${qrData.substring(0, 30)}` })
@@ -297,8 +315,20 @@ export default function OpsPage() {
         setScanResult({ ok: false, msg: `Boleto ya usado — ${ticket.customer_name}` })
         toast.warning(`Boleto ya usado — ${ticket.customer_name}`)
       } else {
-        setScanResult({ ok: true, msg: `Válido — ${ticket.customer_name} · ${ticket.zone_name}` })
-        toast.success(`Válido — ${ticket.customer_name} · ${ticket.zone_name}`)
+        // Write check-in to Supabase
+        const event = events.find(e => e.id === ticket.event_id)
+        markTicketUsed(ticket.id)
+        createCheckinRecord({
+          ticket_id: ticket.id,
+          ticket_number: ticket.ticket_number,
+          customer_name: ticket.customer_name || 'Sin nombre',
+          event_name: event?.name || '',
+          venue: event?.name || '',
+          operator_name: 'Manual',
+        })
+        ticket.status = 'used'
+        setScanResult({ ok: true, msg: `✓ Check-in — ${ticket.customer_name} · ${ticket.zone_name}` })
+        toast.success(`Check-in registrado: ${ticket.customer_name}`)
       }
     } else {
       setScanResult({ ok: false, msg: 'Boleto no encontrado' })
@@ -612,63 +642,97 @@ export default function OpsPage() {
           {/* Clientes Tab */}
           {activeTab === 'clientes' && (
             <div className="space-y-4">
-              {/* Pending Guests Alert */}
+              {/* Pending Guests Management */}
               {pendingGuests.length > 0 && (() => {
                 const withData = pendingGuests.filter(pg => {
                   const g = pg.guests?.[0] || {};
                   return g.name || g.email || g.phone;
                 });
                 const ghostCount = pendingGuests.length - withData.length;
+                const pendingFilter = pendingStatusFilter;
+                const filtered = withData.filter(pg => {
+                  const s = pg.guests?.[0]?._status || 'pending';
+                  if (pendingFilter === 'all') return true;
+                  return s === pendingFilter;
+                });
+                const pendingCount = withData.filter(pg => (pg.guests?.[0]?._status || 'pending') === 'pending').length;
+                const resolvedCount = withData.filter(pg => pg.guests?.[0]?._status === 'resolved').length;
                 return (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <h3 className="text-sm font-extrabold text-red-700 mb-1">⚠️ Clientes Pendientes ({withData.length})</h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                    <h3 className="text-sm font-extrabold text-red-700">⚠️ Clientes Pendientes ({pendingCount} pendientes · {resolvedCount} resueltos)</h3>
+                    <div className="flex gap-1">
+                      {(['all', 'pending', 'resolved'] as const).map(f => (
+                        <button key={f} onClick={() => setPendingStatusFilter(f)} className={`px-2 py-0.5 rounded text-[10px] font-bold ${pendingFilter === f ? 'bg-red-600 text-white' : 'bg-white text-red-600 border border-red-200'}`}>
+                          {f === 'all' ? 'Todos' : f === 'pending' ? 'Pendientes' : 'Resueltos'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   {ghostCount > 0 && (
                     <div className="bg-yellow-50 border border-yellow-200 rounded px-2 py-1.5 mb-2">
-                      <p className="text-[10px] text-yellow-700 font-bold">⚠️ {ghostCount} registros sin datos de cliente — solo contienen Payment ID</p>
-                      <p className="text-[10px] text-yellow-600">Pagos donde el formulario de datos no se completó. Verifica configuración del checkout y webhook de Stripe.</p>
+                      <p className="text-[10px] text-yellow-700 font-bold">⚠️ {ghostCount} registros sin datos — solo Payment ID</p>
                     </div>
                   )}
-                  {withData.length > 0 ? (
+                  {filtered.length > 0 ? (
                     <>
-                    <p className="text-xs text-red-600 mb-1">Pagaron pero no recibieron boletos — requiere acción manual</p>
-                    <p className="text-[10px] text-red-500 mb-2">💡 Busca el Payment ID en Stripe para encontrar datos del comprador y reenviar boletos</p>
-                    <div className="overflow-x-auto">
-                      {/* Desktop table */}
-                      <table className="data-table text-xs hidden sm:table">
-                        <thead><tr><th>Nombre</th><th>Email</th><th>Teléfono</th><th>Payment ID</th><th>Fecha</th></tr></thead>
-                        <tbody>
-                          {withData.map((pg, i) => {
-                            const guest = pg.guests?.[0] || {};
-                            return (
-                            <tr key={pg.id || i}>
-                              <td className="font-bold">{guest.name ? `${guest.name} ${guest.lastName || ''}`.trim() : '—'}</td>
-                              <td className="text-gray-500">{guest.email || '—'}</td>
-                              <td className="whitespace-nowrap">{guest.phone || '—'}</td>
-                              <td className="text-[10px]">{pg.payment_intent_id ? <a href={`https://dashboard.stripe.com/payments/${pg.payment_intent_id}`} target="_blank" rel="noopener noreferrer" className="font-mono text-blue-500 hover:underline">{pg.payment_intent_id.slice(0, 15)}…</a> : '—'}</td>
-                              <td className="whitespace-nowrap">{pg.created_at ? new Date(pg.created_at).toLocaleDateString('es-MX', {day:'numeric',month:'short'}) : '—'}</td>
-                            </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                      {/* Mobile cards */}
-                      <div className="sm:hidden space-y-2">
-                        {withData.map((pg, i) => {
-                          const guest = pg.guests?.[0] || {};
-                          return (
-                          <div key={pg.id || i} className="bg-white border border-gray-200 rounded-lg p-2.5">
-                            <div className="flex justify-between items-start">
-                              <p className="font-bold text-xs">{guest.name ? `${guest.name} ${guest.lastName || ''}`.trim() : '—'}</p>
-                              <span className="text-[10px] text-gray-400">{pg.created_at ? new Date(pg.created_at).toLocaleDateString('es-MX', {day:'numeric',month:'short'}) : ''}</span>
+                    <div className="space-y-2">
+                      {filtered.map((pg, i) => {
+                        const guest = pg.guests?.[0] || {};
+                        const status = guest._status || 'pending';
+                        const isEditing = editingPendingId === pg.id;
+                        return (
+                        <div key={pg.id || i} className={`rounded-lg p-2.5 border ${status === 'resolved' ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-bold text-xs">{guest.name ? `${guest.name} ${guest.lastName || ''}`.trim() : '—'}</p>
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${status === 'resolved' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                                  {status === 'resolved' ? '✓ Resuelto' : '⏳ Pendiente'}
+                                </span>
+                                <span className="text-[10px] text-gray-400">{pg.created_at ? new Date(pg.created_at).toLocaleDateString('es-MX', {day:'numeric',month:'short'}) : ''}</span>
+                              </div>
+                              <p className="text-[10px] text-gray-500">{guest.email || '—'} · {guest.phone || '—'}</p>
+                              {pg.payment_intent_id && <a href={`https://dashboard.stripe.com/payments/${pg.payment_intent_id}`} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono text-blue-500 hover:underline">{pg.payment_intent_id.slice(0, 20)}…</a>}
+                              {guest._notes && <p className="text-[10px] text-gray-500 mt-1 italic">📝 {guest._notes}</p>}
+                              {guest._resolved_at && <p className="text-[9px] text-green-600">Resuelto: {new Date(guest._resolved_at).toLocaleString('es-MX')}</p>}
                             </div>
-                            <p className="text-[10px] text-gray-500 mt-0.5">{guest.email || '—'}</p>
-                            <p className="text-[10px] text-gray-400">{guest.phone || '—'}</p>
-                            {pg.payment_intent_id && <a href={`https://dashboard.stripe.com/payments/${pg.payment_intent_id}`} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono text-blue-500 hover:underline mt-1 inline-block">{pg.payment_intent_id.slice(0, 20)}…</a>}
+                            <div className="flex gap-1 flex-shrink-0">
+                              {status !== 'resolved' && (
+                                <button onClick={async () => {
+                                  await updatePendingGuestStatus(pg.id, 'resolved', pendingNotes[pg.id] || 'Resuelto', 'admin');
+                                  toast.success('Marcado como resuelto');
+                                  // Reload
+                                  const updated = await fetchPendingGuests();
+                                  setPendingGuests(updated);
+                                }} className="px-2 py-1 bg-green-500 text-white rounded text-[10px] font-bold hover:bg-green-600">✓ Resolver</button>
+                              )}
+                              {status === 'resolved' && (
+                                <button onClick={async () => {
+                                  await updatePendingGuestStatus(pg.id, 'pending');
+                                  const updated = await fetchPendingGuests();
+                                  setPendingGuests(updated);
+                                }} className="px-2 py-1 bg-gray-200 text-gray-600 rounded text-[10px] font-bold hover:bg-gray-300">↩ Reabrir</button>
+                              )}
+                              <button onClick={() => setEditingPendingId(isEditing ? null : pg.id)} className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-[10px] font-bold hover:bg-gray-200">✏️</button>
+                            </div>
                           </div>
-                          );
+                          {isEditing && (
+                            <div className="mt-2 flex gap-2">
+                              <input type="text" placeholder="Notas..." value={pendingNotes[pg.id] || ''} onChange={e => setPendingNotes(n => ({...n, [pg.id]: e.target.value}))} className="flex-1 px-2 py-1 border border-gray-200 rounded text-[10px]" />
+                              <button onClick={async () => {
+                                await updatePendingGuestStatus(pg.id, status, pendingNotes[pg.id] || '');
+                                toast.success('Nota guardada');
+                                setEditingPendingId(null);
+                                const updated = await fetchPendingGuests();
+                                setPendingGuests(updated);
+                              }} className="px-2 py-1 bg-blue-500 text-white rounded text-[10px] font-bold">Guardar</button>
+                            </div>
+                          )}
+                        </div>
+                        );
                         })}
                       </div>
-                    </div>
                     </>
                   ) : (
                     <p className="text-[10px] text-gray-500">Todos los registros pendientes carecen de datos de cliente. Revisa la configuración del webhook de Stripe.</p>
