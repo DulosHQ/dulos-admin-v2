@@ -820,7 +820,7 @@ export async function fetchVenueSeats(venueId: string): Promise<VenueSeat[]> {
 
 export async function fetchEventSections(eventId: string): Promise<EventSection[]> {
   try {
-    return await supabaseFetch<EventSection[]>(`event_sections?event_id=eq.${eventId}&order=sort_order.asc`);
+    return await supabaseFetch<EventSection[]>(`event_sections?event_id=eq.${eventId}&order=created_at.asc`);
   } catch {
     // Table may not exist yet — silent fail
     return [];
