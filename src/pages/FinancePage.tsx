@@ -274,9 +274,16 @@ export default function FinancePage() {
     // Compute actual tickets sold AND revenue from orders (fallback when v_sales_summary is stale)
     const orderTicketsByEvent = new Map<string, number>();
     const orderRevenueByEvent = new Map<string, number>();
-    rawOrders.filter(o => o.payment_status === 'completed').forEach(o => {
-      orderTicketsByEvent.set(o.event_id, (orderTicketsByEvent.get(o.event_id) || 0) + (o.quantity || 1));
-      orderRevenueByEvent.set(o.event_id, (orderRevenueByEvent.get(o.event_id) || 0) + (o.total_price || 0));
+    const orderRefundsByEvent = new Map<string, number>();
+    const orderRefundAmountByEvent = new Map<string, number>();
+    rawOrders.forEach(o => {
+      if (o.payment_status === 'completed') {
+        orderTicketsByEvent.set(o.event_id, (orderTicketsByEvent.get(o.event_id) || 0) + (o.quantity || 1));
+        orderRevenueByEvent.set(o.event_id, (orderRevenueByEvent.get(o.event_id) || 0) + (o.total_price || 0));
+      } else if (o.payment_status === 'refunded') {
+        orderRefundsByEvent.set(o.event_id, (orderRefundsByEvent.get(o.event_id) || 0) + 1);
+        orderRefundAmountByEvent.set(o.event_id, (orderRefundAmountByEvent.get(o.event_id) || 0) + (o.total_price || 0));
+      }
     });
 
     const eventRevenues = Array.from(eventAggMap.values()).map(e => {
@@ -300,7 +307,8 @@ export default function FinancePage() {
         revenue: realRevenue,
         orders: e.orders,
         tickets: realTickets,
-        refunded: e.refunded || 0,
+        refunded: e.event_ids.reduce((sum, eid) => sum + (orderRefundsByEvent.get(eid) || 0), 0) || e.refunded || 0,
+        refunded_amount: e.event_ids.reduce((sum, eid) => sum + (orderRefundAmountByEvent.get(eid) || 0), 0),
         image_url: e.image_url,
       };
     }).sort((a, b) => b.revenue - a.revenue);
