@@ -30,7 +30,7 @@ import {
 } from '../lib/supabase';
 
 type TabKey = 'ingresos' | 'tendencias' | 'transacciones' | 'comisiones';
-type DateRange = '7d' | '30d' | '90d' | 'all';
+type DateRange = '7d' | '30d' | '90d' | 'all' | 'custom';
 
 interface ScheduleDisplay {
   name: string;
@@ -70,6 +70,7 @@ const dateRangeOptions: { key: DateRange; label: string }[] = [
   { key: '30d', label: '30d' },
   { key: '90d', label: '90d' },
   { key: 'all', label: 'Todo' },
+  { key: 'custom', label: 'Rango' },
 ];
 
 const ZONE_COLORS: Record<string, string> = {
@@ -118,6 +119,8 @@ export default function FinancePage() {
   // "Aplicar Filtros" pattern: pending state until user clicks "Aplicar"
   const [pendingEvent, setPendingEvent] = useState('');
   const [pendingDateRange, setPendingDateRange] = useState<DateRange>('all');
+  const [customDateFrom, setCustomDateFrom] = useState('');
+  const [customDateTo, setCustomDateTo] = useState('');
   const [filtersApplied, setFiltersApplied] = useState(false);
 
   const applyFilters = () => {
@@ -130,13 +133,15 @@ export default function FinancePage() {
   const clearFilters = () => {
     setPendingEvent('');
     setPendingDateRange('all');
+    setCustomDateFrom('');
+    setCustomDateTo('');
     setSelectedEvent('');
     setDateRange('all');
     setFiltersApplied(false);
     setTxPage(0);
   };
 
-  const hasFilterChanges = pendingEvent !== selectedEvent || pendingDateRange !== dateRange;
+  const hasFilterChanges = pendingEvent !== selectedEvent || pendingDateRange !== dateRange || (pendingDateRange === 'custom' && (customDateFrom || customDateTo));
 
   // Raw data
   const [events, setEvents] = useState<DulosEvent[]>([]);
@@ -214,7 +219,11 @@ export default function FinancePage() {
 
     // Date cutoff
     let cutoff: Date | null = null;
-    if (dateRange !== 'all') {
+    let cutoffEnd: Date | null = null;
+    if (dateRange === 'custom') {
+      if (customDateFrom) cutoff = new Date(customDateFrom + 'T00:00:00');
+      if (customDateTo) cutoffEnd = new Date(customDateTo + 'T23:59:59');
+    } else if (dateRange !== 'all') {
       cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - (dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90));
     }
@@ -224,8 +233,13 @@ export default function FinancePage() {
     const eventFilteredTickets = selectedEvent ? rawTickets.filter(t => t.event_id === selectedEvent) : rawTickets;
 
     // Filter tickets by date
-    const filteredTickets = cutoff
-      ? eventFilteredTickets.filter(t => new Date(t.created_at) >= cutoff!)
+    const filteredTickets = (cutoff || cutoffEnd)
+      ? eventFilteredTickets.filter(t => {
+          const d = new Date(t.created_at);
+          if (cutoff && d < cutoff) return false;
+          if (cutoffEnd && d > cutoffEnd) return false;
+          return true;
+        })
       : eventFilteredTickets;
 
     // Filter schedules by event
@@ -646,7 +660,7 @@ export default function FinancePage() {
       cityBreakdown,
       browserBreakdown,
     };
-  }, [loading, events, rawZones, rawTickets, rawSchedules, rawEventRevenues, salesSummary, rawOrders, pedidosData, selectedEvent, dateRange, dispersions]);
+  }, [loading, events, rawZones, rawTickets, rawSchedules, rawEventRevenues, salesSummary, rawOrders, pedidosData, selectedEvent, dateRange, customDateFrom, customDateTo, dispersions]);
 
   // Handle revenue event drill-down
   const handleRevenueEventClick = async (eventId: string, eventIds?: string[]) => {
@@ -906,6 +920,15 @@ export default function FinancePage() {
               </button>
             ))}
           </div>
+
+          {/* Custom date range inputs */}
+          {pendingDateRange === 'custom' && (
+            <div className="flex gap-1.5 items-center flex-shrink-0">
+              <input type="date" value={customDateFrom} onChange={e => setCustomDateFrom(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#EF4444]" />
+              <span className="text-xs text-gray-400">→</span>
+              <input type="date" value={customDateTo} onChange={e => setCustomDateTo(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#EF4444]" />
+            </div>
+          )}
 
           {/* Event dropdown */}
           <select
