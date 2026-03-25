@@ -445,7 +445,7 @@ export default function OpsPage() {
                   <span className="text-red-500 text-lg flex-shrink-0">⚠️</span>
                   <div>
                     <p className="text-xs font-bold text-red-700">Error de cámara</p>
-                    <p className="text-xs text-red-600 mt-0.5">{cameraError}</p>
+                    <p className="text-xs text-red-600 mt-0.5 whitespace-pre-line">{cameraError}</p>
                     <button onClick={() => { setCameraError(null); startCamera(); }} className="mt-2 px-3 py-1 bg-red-100 text-red-700 rounded text-xs font-bold hover:bg-red-200">Reintentar</button>
                   </div>
                 </div>
