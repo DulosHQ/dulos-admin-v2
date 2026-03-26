@@ -1095,6 +1095,289 @@ export async function updatePendingGuestStatus(id: string, status: string, notes
   }
 }
 
+// ─── WAR ROOM DATA FETCHERS ───
+
+export interface WarRoomKPIs {
+  activeEvents: number;
+  avgOccupancy: number;
+  totalRevenue: number;
+  totalAdSpend: number;
+}
+
+export interface WarRoomEvent {
+  id: string;
+  name: string;
+  image_url: string;
+  venue_name: string;
+  venue_city: string;
+  next_date: string | null;
+  occupancy_pct: number;
+  total_sold: number;
+  total_capacity: number;
+  revenue: number;
+  ad_spend: number;
+  roas: number | null;
+  status: 'on_track' | 'slow' | 'critical';
+  sales_trend: number[];
+}
+
+export interface WarRoomActivity {
+  id: string;
+  type: 'sale' | 'checkin';
+  customer_name: string;
+  event_name: string;
+  amount?: number;
+  time_ago: string;
+}
+
+export async function fetchWarRoomKPIs(): Promise<WarRoomKPIs> {
+  try {
+    // Count active events with upcoming functions
+    const today = new Date().toISOString().split('T')[0];
+    const [events, schedules, orders, dispersions] = await Promise.all([
+      supabaseFetch<DulosEvent[]>('events?status=eq.active'),
+      supabaseFetch<Schedule[]>(`schedules?date=gte.${today}&status=eq.active`),
+      supabaseFetch<Order[]>('orders?payment_status=in.(completed,paid)'),
+      supabaseFetch<DispersionFull[]>('dispersions')
+    ]);
+
+    // Active events = events with upcoming functions
+    const eventsWithUpcomingFunctions = new Set(schedules.map(s => s.event_id));
+    const activeEvents = events.filter(e => eventsWithUpcomingFunctions.has(e.id)).length;
+
+    // Get occupancy data
+    const [inventory, allSchedules] = await Promise.all([
+      supabaseFetch<ScheduleInventory[]>('schedule_inventory'),
+      supabaseFetch<Schedule[]>('schedules?status=eq.active')
+    ]);
+
+    // Calculate avg occupancy across active events
+    const eventOccupancies: { [eventId: string]: { sold: number; capacity: number } } = {};
+    
+    inventory.forEach(inv => {
+      const schedule = allSchedules.find(s => s.id === inv.schedule_id);
+      if (schedule && eventsWithUpcomingFunctions.has(schedule.event_id)) {
+        if (!eventOccupancies[schedule.event_id]) {
+          eventOccupancies[schedule.event_id] = { sold: 0, capacity: 0 };
+        }
+        eventOccupancies[schedule.event_id].sold += inv.sold;
+        eventOccupancies[schedule.event_id].capacity += inv.total_capacity;
+      }
+    });
+
+    const occupancies = Object.values(eventOccupancies).map(o => 
+      o.capacity > 0 ? (o.sold / o.capacity) * 100 : 0
+    );
+    const avgOccupancy = occupancies.length > 0 ? occupancies.reduce((a, b) => a + b, 0) / occupancies.length : 0;
+
+    // Total revenue
+    const totalRevenue = orders.reduce((sum, o) => 
+      sum + (o.total_price - (o.discount_amount || 0)), 0
+    );
+
+    // Total ad spend
+    const totalAdSpend = dispersions.reduce((sum, d) => sum + (d.ad_spend || 0), 0);
+
+    return {
+      activeEvents,
+      avgOccupancy: Math.round(avgOccupancy),
+      totalRevenue,
+      totalAdSpend
+    };
+  } catch (error) {
+    console.error('Error fetching war room KPIs:', error);
+    throw error;
+  }
+}
+
+export async function fetchWarRoomEvents(): Promise<WarRoomEvent[]> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const [events, schedules, inventory, orders, dispersions, venues] = await Promise.all([
+      supabaseFetch<DulosEvent[]>('events?status=eq.active'),
+      supabaseFetch<Schedule[]>(`schedules?date=gte.${today}&status=eq.active&order=date.asc`),
+      supabaseFetch<ScheduleInventory[]>('schedule_inventory'),
+      supabaseFetch<Order[]>('orders?payment_status=in.(completed,paid)'),
+      supabaseFetch<DispersionFull[]>('dispersions'),
+      getVenueMap()
+    ]);
+
+    // Group data by event
+    const eventData: { [eventId: string]: WarRoomEvent } = {};
+    
+    events.forEach(event => {
+      // Get next function for this event
+      const eventSchedules = schedules.filter(s => s.event_id === event.id);
+      const nextDate = eventSchedules.length > 0 ? eventSchedules[0].date : null;
+      
+      // Calculate occupancy for this event
+      let totalSold = 0;
+      let totalCapacity = 0;
+      
+      eventSchedules.forEach(schedule => {
+        const schedInventory = inventory.filter(inv => inv.schedule_id === schedule.id);
+        schedInventory.forEach(inv => {
+          totalSold += inv.sold;
+          totalCapacity += inv.total_capacity;
+        });
+      });
+
+      const occupancyPct = totalCapacity > 0 ? (totalSold / totalCapacity) * 100 : 0;
+      
+      // Calculate revenue for this event
+      const eventOrders = orders.filter(o => o.event_id === event.id);
+      const revenue = eventOrders.reduce((sum, o) => 
+        sum + (o.total_price - (o.discount_amount || 0)), 0
+      );
+
+      // Get ad spend for this event
+      const eventDisp = dispersions.filter(d => d.event_id === event.id);
+      const adSpend = eventDisp.reduce((sum, d) => sum + (d.ad_spend || 0), 0);
+      const roas = adSpend > 0 ? revenue / adSpend : null;
+
+      // Calculate sales trend (last 14 days)
+      const fourteenDaysAgo = new Date();
+      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+      
+      const recentOrders = eventOrders.filter(o => 
+        new Date(o.purchased_at) >= fourteenDaysAgo
+      );
+
+      // Group by day for sparkline
+      const dailySales: { [date: string]: number } = {};
+      for (let i = 13; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        dailySales[dateStr] = 0;
+      }
+
+      recentOrders.forEach(order => {
+        const dateStr = order.purchased_at.split('T')[0];
+        if (dailySales[dateStr] !== undefined) {
+          dailySales[dateStr] += (order.total_price - (order.discount_amount || 0));
+        }
+      });
+
+      const salesTrend = Object.values(dailySales);
+
+      // Calculate status based on expected pace
+      let status: 'on_track' | 'slow' | 'critical' = 'on_track';
+      
+      if (nextDate && eventSchedules.length > 0) {
+        const daysUntilEvent = Math.ceil((new Date(nextDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+        const firstOrderDate = eventOrders.sort((a, b) => new Date(a.purchased_at).getTime() - new Date(b.purchased_at).getTime())[0]?.purchased_at;
+        
+        if (firstOrderDate && daysUntilEvent > 0) {
+          const daysSinceFirstSale = Math.ceil((new Date().getTime() - new Date(firstOrderDate).getTime()) / (1000 * 60 * 60 * 24));
+          const totalDays = daysSinceFirstSale + daysUntilEvent;
+          const expectedPace = totalDays > 0 ? (daysSinceFirstSale / totalDays) * 100 : 100;
+          
+          if (occupancyPct < expectedPace * 0.5) {
+            status = 'critical';
+          } else if (occupancyPct < expectedPace) {
+            status = 'slow';
+          }
+        }
+      }
+
+      const venue = venues.get(event.venue_id);
+      
+      eventData[event.id] = {
+        id: event.id,
+        name: event.name,
+        image_url: event.image_url || '',
+        venue_name: venue?.name || '',
+        venue_city: venue?.city || '',
+        next_date: nextDate,
+        occupancy_pct: Math.round(occupancyPct),
+        total_sold: totalSold,
+        total_capacity: totalCapacity,
+        revenue,
+        ad_spend: adSpend,
+        roas,
+        status,
+        sales_trend: salesTrend
+      };
+    });
+
+    // Filter to only events with upcoming functions and sort by next date
+    return Object.values(eventData)
+      .filter(e => e.next_date !== null)
+      .sort((a, b) => {
+        if (!a.next_date || !b.next_date) return 0;
+        return new Date(a.next_date).getTime() - new Date(b.next_date).getTime();
+      });
+      
+  } catch (error) {
+    console.error('Error fetching war room events:', error);
+    throw error;
+  }
+}
+
+export async function fetchWarRoomActivity(): Promise<WarRoomActivity[]> {
+  try {
+    const [orders, checkins, events] = await Promise.all([
+      supabaseFetch<Order[]>('orders?payment_status=in.(completed,paid)&order=purchased_at.desc&limit=50'),
+      supabaseFetch<Checkin[]>('checkins?order=scanned_at.desc&limit=20'),
+      fetchAllEvents()
+    ]);
+
+    const eventMap = new Map(events.map(e => [e.id, e.name]));
+    const activities: WarRoomActivity[] = [];
+
+    // Recent sales
+    orders.slice(0, 10).forEach(order => {
+      if (order.customer_name) {
+        activities.push({
+          id: `order-${order.id}`,
+          type: 'sale',
+          customer_name: order.customer_name,
+          event_name: eventMap.get(order.event_id) || order.event_id,
+          amount: order.total_price - (order.discount_amount || 0),
+          time_ago: formatTimeAgo(order.purchased_at)
+        });
+      }
+    });
+
+    // Recent checkins
+    checkins.slice(0, 5).forEach(checkin => {
+      if (checkin.customer_name && checkin.customer_name !== 'DUPLICADO') {
+        activities.push({
+          id: `checkin-${checkin.id}`,
+          type: 'checkin',
+          customer_name: checkin.customer_name,
+          event_name: checkin.event_name,
+          time_ago: formatTimeAgo(checkin.scanned_at)
+        });
+      }
+    });
+
+    return activities.sort((a, b) => {
+      // Simple sort - sales first, then checkins
+      if (a.type === 'sale' && b.type === 'checkin') return -1;
+      if (a.type === 'checkin' && b.type === 'sale') return 1;
+      return 0;
+    }).slice(0, 15);
+
+  } catch (error) {
+    console.error('Error fetching war room activity:', error);
+    return [];
+  }
+}
+
+function formatTimeAgo(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'ahora';
+  if (diffMins < 60) return `${diffMins}m`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h`;
+  return `${Math.floor(diffHours / 24)}d`;
+}
+
 // ─── Check-in (QR Scan → Supabase) ───
 
 export async function createCheckinRecord(data: {
