@@ -347,7 +347,11 @@ export default function FinancePage() {
           }
           
           // Capacity: from inventory (sold + available = Dulos allocation, NOT venue capacity)
-          const capacity = scheduleInventory.reduce((sum, inv) => sum + (inv.sold + inv.available), 0);
+          // Fallback to event-level ticket_zones total_capacity if inventory not loaded
+          let capacity = scheduleInventory.reduce((sum, inv) => sum + (inv.sold + inv.available), 0);
+          if (capacity === 0) {
+            capacity = eventZones.reduce((sum, z) => sum + (z.total_capacity || 0), 0);
+          }
           
           // Revenue from orders
           let revenue = 0;
