@@ -18,7 +18,6 @@ import {
   ScheduleInventory,
   Venue,
 } from '../lib/supabase';
-import FunctionDetail from './FunctionDetail';
 import EventWizard from './EventWizard';
 
 /* ─── Types ─── */
@@ -32,12 +31,10 @@ interface EventCard {
   venue_id: string;
   venueName: string;
   venueCity: string;
-  totalSold: number;
-  totalCapacity: number;
-  revenue: number;
-  occupancyPct: number;
   isPast: boolean;
   schedules: ScheduleRow[];
+  slug?: string;
+  description?: string;
 }
 interface ScheduleRow {
   id: string;
@@ -45,33 +42,34 @@ interface ScheduleRow {
   start_time: string;
   end_time: string;
   status: string;
-  sold: number;
-  capacity: number;
-  occupancyPct: number;
-  revenue: number;
-  zones: ZoneRow[];
 }
 interface ZoneRow {
   zone_id: string;
   zone_name: string;
   zone_type: string;
   price: number;
-  sold: number;
-  capacity: number;
-  occupancyPct: number;
+  total_capacity: number;
+}
+interface OrderRow {
+  order_number: string;
+  customer_name: string;
+  customer_email: string;
+  zone: string;
+  quantity: number;
+  total_price: number;
+  payment_status: string;
+  purchased_at: string;
+  schedule_id?: string | null;
 }
 type StatusFilter = 'all' | 'active' | 'completed' | 'past';
+type EventTab = 'info' | 'funciones' | 'zonas' | 'compradores';
 
 /* ─── Helpers ─── */
-const fmt = (n: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(n);
 const fmtDate = (d: string) => { if (!d) return '—'; try { const dt = new Date(d); return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }); } catch { return '—'; } };
 const fmtTime = (t: string) => t ? t.slice(0, 5) : '';
+const fmtDateTime = (d: string) => { if (!d) return '—'; try { const dt = new Date(d); return isNaN(dt.getTime()) ? '—' : dt.toLocaleString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return '—'; } };
+const fmt = (n: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(n);
 
-function Sem({ pct, sm }: { pct: number; sm?: boolean }) {
-  const c = pct >= 70 ? 'bg-green-500' : pct >= 30 ? 'bg-yellow-500' : 'bg-red-500';
-  return <span className={`inline-block rounded-full flex-shrink-0 ${sm ? 'w-2.5 h-2.5' : 'w-3 h-3'} ${c}`} title={`${pct.toFixed(1)}%`} />;
-}
-function SemEmoji({ pct }: { pct: number }) { return <span title={`${pct.toFixed(1)}%`}>{pct >= 70 ? '🟢' : pct >= 30 ? '🟡' : '🔴'}</span>; }
 function Badge({ status, isPast }: { status: string; isPast: boolean }) {
   if (isPast) return <span className="text-[10px] bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full">Pasado</span>;
   if (status === 'active') return <span className="text-[10px] bg-green-900/50 text-green-400 px-2 py-0.5 rounded-full">Activo</span>;
@@ -84,72 +82,203 @@ function Skel() {
   return (<div className="space-y-3 animate-pulse">{[1,2,3,4].map(i=><div key={i} className="bg-[#111] rounded-xl p-4 flex gap-4"><div className="w-20 h-20 rounded-lg bg-gray-800 flex-shrink-0"/><div className="flex-1 space-y-2"><div className="h-4 bg-gray-800 rounded w-1/3"/><div className="h-3 bg-gray-800 rounded w-1/4"/><div className="h-3 bg-gray-800 rounded w-1/2"/></div></div>)}</div>);
 }
 
-/* ─── Drill-down view ─── */
-function DrillDown({ event: ev, onBack }: { event: EventCard; onBack: () => void }) {
-  const [expId, setExpId] = useState<string | null>(null);
+/* ─── Event Detail Tabs ─── */
+function EventDetail({ event: ev, onBack, zones, orders }: { event: EventCard; onBack: () => void; zones: TicketZone[]; orders: Order[] }) {
+  const [activeTab, setActiveTab] = useState<EventTab>('info');
+
+  // Get zones for this event
+  const eventZones = zones.filter(z => z.event_id === ev.id);
+  
+  // Get orders for this event (completed/paid only)
+  const eventOrders: OrderRow[] = orders
+    .filter(o => o.event_id === ev.id && (o.payment_status === 'completed' || o.payment_status === 'paid'))
+    .map(o => ({
+      order_number: o.order_number || 'N/A',
+      customer_name: o.customer_name || 'N/A',
+      customer_email: o.customer_email || 'N/A', 
+      zone: o.zone_name || 'N/A',
+      quantity: o.quantity || 0,
+      total_price: o.total_price || 0,
+      payment_status: o.payment_status || 'pending',
+      purchased_at: o.purchased_at || '',
+      schedule_id: o.schedule_id
+    }))
+    .sort((a, b) => new Date(b.purchased_at).getTime() - new Date(a.purchased_at).getTime());
+
+  const nextFunction = ev.schedules.length > 0 
+    ? ev.schedules.find(s => new Date(s.date) >= new Date()) 
+    : null;
+
   return (
     <div className="animate-fade-in">
       <button onClick={onBack} className="flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-4 transition-colors">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         Volver a eventos
       </button>
+
+      {/* Header */}
       <div className="bg-[#111] rounded-xl p-4 mb-4 flex flex-col sm:flex-row gap-4">
         {ev.image_url ? <img src={ev.image_url} alt={ev.name} className="w-full sm:w-40 h-32 sm:h-28 rounded-lg object-cover flex-shrink-0"/> : <div className="w-full sm:w-40 h-32 sm:h-28 rounded-lg bg-gray-800 flex items-center justify-center text-gray-600 text-3xl flex-shrink-0">?</div>}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <h2 className="text-lg font-bold text-white truncate">{ev.name}</h2>
-            <SemEmoji pct={ev.occupancyPct}/>
             <Badge status={ev.status} isPast={ev.isPast}/>
           </div>
           <p className="text-sm text-gray-400">{ev.venueName}{ev.venueCity ? `, ${ev.venueCity}` : ''}</p>
           <div className="flex flex-wrap gap-4 mt-3 text-sm">
-            <div><span className="text-gray-500">Vendidos</span><p className="text-white font-bold">{ev.totalSold.toLocaleString()} / {ev.totalCapacity.toLocaleString()}</p></div>
-            <div><span className="text-gray-500">Ocupación</span><p className="text-white font-bold">{ev.occupancyPct.toFixed(1)}%</p></div>
-            <div><span className="text-gray-500">Revenue</span><p className="text-white font-bold">{fmt(ev.revenue)}</p></div>
-            <div><span className="text-gray-500">Funciones</span><p className="text-white font-bold">{ev.schedules.length}</p></div>
+            <div><span className="text-gray-500">Tipo</span><p className="text-white font-medium">{ev.event_type === 'single' ? 'Único' : ev.event_type === 'recurring' ? 'Recurrente' : 'Múltiple'}</p></div>
+            <div><span className="text-gray-500">Funciones</span><p className="text-white font-medium">{ev.schedules.length}</p></div>
+            {nextFunction && <div><span className="text-gray-500">Próxima función</span><p className="text-white font-medium">{fmtDate(nextFunction.date)}</p></div>}
           </div>
         </div>
       </div>
-      {ev.schedules.length === 0 ? (
-        <div className="bg-[#111] rounded-xl p-8 text-center text-gray-500">Sin funciones registradas</div>
-      ) : (
-        <div className="space-y-2">{ev.schedules.map(s => {
-          const exp = expId === s.id;
-          return (
-            <div key={s.id} className="bg-[#111] rounded-xl overflow-hidden">
-              <div onClick={() => setExpId(exp ? null : s.id)} className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-[#181818] transition-colors">
-                <div className="flex items-center gap-3 min-w-0">
-                  <Sem pct={s.occupancyPct}/>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-white">{fmtDate(s.date)}</p>
-                    <p className="text-xs text-gray-500">{fmtTime(s.start_time)}{s.end_time ? ` — ${fmtTime(s.end_time)}` : ''}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 sm:gap-6 flex-shrink-0">
-                  <div className="text-right hidden sm:block"><p className="text-xs text-gray-500">Revenue</p><p className="text-sm font-bold text-white">{fmt(s.revenue)}</p></div>
-                  <div className="text-right"><p className="text-xs text-gray-500">Vendidos</p><p className="text-sm font-bold text-white">{s.sold}/{s.capacity}</p></div>
-                  <div className="text-right min-w-[50px]"><p className="text-xs text-gray-500">Ocup.</p><p className={`text-sm font-bold ${s.occupancyPct >= 70 ? 'text-green-400' : s.occupancyPct >= 30 ? 'text-yellow-400' : 'text-red-400'}`}>{s.occupancyPct.toFixed(0)}%</p></div>
-                  <svg className={`w-4 h-4 text-gray-500 transition-transform flex-shrink-0 ${exp ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
-                </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 rounded-lg bg-[#111] p-1 w-fit mb-4">
+        {([
+          {k:'info' as EventTab, l:'Info'},
+          {k:'funciones' as EventTab, l:'Funciones'},
+          {k:'zonas' as EventTab, l:'Zonas y Precios'},
+          {k:'compradores' as EventTab, l:'Compradores'}
+        ]).map(t => (
+          <button key={t.k} onClick={() => setActiveTab(t.k)} className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${activeTab===t.k?'bg-white text-black':'text-gray-400 hover:text-white'}`}>{t.l}</button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      <div className="bg-[#111] rounded-xl p-4">
+        {activeTab === 'info' && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Información Básica</h3>
+              <div className="space-y-3">
+                <div><span className="text-gray-500 text-sm">Nombre:</span> <span className="text-white">{ev.name}</span></div>
+                <div><span className="text-gray-500 text-sm">Venue:</span> <span className="text-white">{ev.venueName}</span></div>
+                <div><span className="text-gray-500 text-sm">Ciudad:</span> <span className="text-white">{ev.venueCity || 'N/A'}</span></div>
+                <div><span className="text-gray-500 text-sm">Slug:</span> <span className="text-white">{ev.slug || 'N/A'}</span></div>
+                <div><span className="text-gray-500 text-sm">Estado:</span> <Badge status={ev.status} isPast={ev.isPast}/></div>
+                <div><span className="text-gray-500 text-sm">Tipo de evento:</span> <span className="text-white">{ev.event_type === 'single' ? 'Evento único' : ev.event_type === 'recurring' ? 'Recurrente' : 'Múltiple'}</span></div>
+                {ev.description && <div><span className="text-gray-500 text-sm">Descripción:</span> <p className="text-white mt-1">{ev.description}</p></div>}
+                {ev.slug && <div><span className="text-gray-500 text-sm">Página pública:</span> <a href={`https://dulos.io/evento/${ev.slug}`} target="_blank" rel="noopener noreferrer" className="text-red-400 hover:text-red-300 underline">dulos.io/evento/{ev.slug}</a></div>}
               </div>
-              {exp && (
-                <FunctionDetail
-                  scheduleId={s.id}
-                  eventId={ev.id}
-                  eventName={ev.name}
-                  venueName={ev.venueName}
-                  date={s.date}
-                  startTime={s.start_time}
-                  endTime={s.end_time}
-                  status={s.status}
-                  totalSold={s.sold}
-                  totalCapacity={s.capacity}
-                />
-              )}
             </div>
-          );
-        })}</div>
-      )}
+          </div>
+        )}
+
+        {activeTab === 'funciones' && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Funciones Programadas</h3>
+            {ev.schedules.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">No hay funciones programadas</div>
+            ) : (
+              <div className="space-y-2">
+                {ev.schedules.map(s => (
+                  <div key={s.id} className="border border-gray-800 rounded-lg p-3 hover:border-gray-700 transition-colors">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-white font-medium">{fmtDate(s.date)}</p>
+                        <p className="text-sm text-gray-400">{fmtTime(s.start_time)}{s.end_time ? ` — ${fmtTime(s.end_time)}` : ''}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-xs px-2 py-1 rounded-full ${s.status === 'active' ? 'bg-green-900/50 text-green-400' : s.status === 'cancelled' ? 'bg-red-900/50 text-red-400' : 'bg-gray-700 text-gray-300'}`}>
+                          {s.status === 'active' ? 'Activa' : s.status === 'cancelled' ? 'Cancelada' : 'Cerrada'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'zonas' && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Zonas y Precios</h3>
+            {eventZones.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">No hay zonas configuradas</div>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-gray-800">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-900/50">
+                    <tr className="text-gray-400">
+                      <th className="text-left px-4 py-3">Zona</th>
+                      <th className="text-center px-4 py-3">Tipo</th>
+                      <th className="text-right px-4 py-3">Precio</th>
+                      <th className="text-right px-4 py-3">Capacidad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {eventZones.map((z, i) => (
+                      <tr key={i} className="border-t border-gray-800/50">
+                        <td className="px-4 py-3 text-white font-medium">{z.zone_name}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${(z.zone_type === 'general' || z.zone_type === 'ga') ? 'bg-green-900/40 text-green-400' : 'bg-orange-900/40 text-orange-400'}`}>
+                            {(z.zone_type === 'general' || z.zone_type === 'ga') ? 'GA' : 'RES'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right text-white font-medium">{fmt(z.price || 0)}</td>
+                        <td className="px-4 py-3 text-right text-gray-400">{((z.available || 0) + (z.sold || 0)).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'compradores' && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Compradores</h3>
+            {eventOrders.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">No hay órdenes registradas</div>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-gray-800">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-900/50">
+                      <tr className="text-gray-400">
+                        <th className="text-left px-3 py-3 whitespace-nowrap">Orden</th>
+                        <th className="text-left px-3 py-3 whitespace-nowrap">Cliente</th>
+                        <th className="text-left px-3 py-3 whitespace-nowrap">Email</th>
+                        <th className="text-left px-3 py-3 whitespace-nowrap">Zona</th>
+                        <th className="text-right px-3 py-3 whitespace-nowrap">Qty</th>
+                        <th className="text-right px-3 py-3 whitespace-nowrap">Total</th>
+                        <th className="text-center px-3 py-3 whitespace-nowrap">Estado</th>
+                        <th className="text-left px-3 py-3 whitespace-nowrap">Compra</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {eventOrders.slice(0, 50).map((o, i) => (
+                        <tr key={i} className="border-t border-gray-800/50">
+                          <td className="px-3 py-2 text-white font-medium">{o.order_number}</td>
+                          <td className="px-3 py-2 text-white">{o.customer_name}</td>
+                          <td className="px-3 py-2 text-gray-400 text-xs">{o.customer_email}</td>
+                          <td className="px-3 py-2 text-gray-400">{o.zone}</td>
+                          <td className="px-3 py-2 text-right text-white">{o.quantity}</td>
+                          <td className="px-3 py-2 text-right text-white font-medium">{fmt(o.total_price)}</td>
+                          <td className="px-3 py-2 text-center">
+                            <span className={`text-xs px-2 py-1 rounded-full ${o.payment_status === 'completed' ? 'bg-green-900/50 text-green-400' : o.payment_status === 'paid' ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}`}>
+                              {o.payment_status === 'completed' || o.payment_status === 'paid' ? 'Pagada' : 'Pendiente'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-gray-400 text-xs">{fmtDateTime(o.purchased_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {eventOrders.length > 50 && (
+                  <div className="px-4 py-2 bg-gray-900/30 text-xs text-gray-500 text-center">
+                    Mostrando las primeras 50 órdenes de {eventOrders.length} totales
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -188,82 +317,39 @@ export default function EventsPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const zoneById = useMemo(() => { const m = new Map<string, TicketZone & {id:string}>(); zones.forEach(z => { const t = z as TicketZone & {id:string}; if(t.id) m.set(t.id, t); }); return m; }, [zones]);
-  const revByEvent = useMemo(() => { const m = new Map<string, number>(); orders.forEach(o => { if(o.payment_status==='completed'||o.payment_status==='paid') m.set(o.event_id, (m.get(o.event_id)||0)+o.total_price); }); return m; }, [orders]);
-  const revBySched = useMemo(() => { 
-    const m = new Map<string, number>(); 
-    const schedMap = new Map<string, string>(); // event_id -> schedule_id mapping for date matching
-    schedules.forEach(s => schedMap.set(s.event_id + '|' + s.date, s.id));
-    
-    orders.forEach(o => { 
-      if(o.payment_status==='completed'||o.payment_status==='paid') {
-        if(o.schedule_id) {
-          // Direct schedule_id match
-          m.set(o.schedule_id, (m.get(o.schedule_id)||0)+o.total_price); 
-        } else if(o.event_date) {
-          // Fallback: match by event_id + date for LEGACY orders
-          const scheduleId = schedMap.get(o.event_id + '|' + o.event_date);
-          if(scheduleId) {
-            m.set(scheduleId, (m.get(scheduleId)||0)+o.total_price);
-          }
-        }
-      }
-    }); 
-    return m; 
-  }, [orders, schedules]);
-  const invBySched = useMemo(() => { const m = new Map<string, ScheduleInventory[]>(); allInv.forEach(i => { const a = m.get(i.schedule_id)||[]; a.push(i); m.set(i.schedule_id, a); }); return m; }, [allInv]);
+  // Removed financial calculations - this is now a management-only view
 
   const cards: EventCard[] = useMemo(() => {
     const today = new Date(); today.setHours(0,0,0,0);
     return events.map(evt => {
       const eSch = schedules.filter(s => s.event_id === evt.id);
-      const eZon = zones.filter(z => z.event_id === evt.id);
       const isPast = eSch.length > 0 ? eSch.every(s => { const d = new Date(s.date); d.setHours(0,0,0,0); return d < today; }) : evt.start_date ? new Date(evt.start_date) < today : false;
-      const rows: ScheduleRow[] = eSch.sort((a,b) => (a.date||'').localeCompare(b.date||'')||(a.start_time||'').localeCompare(b.start_time||'')).map(sc => {
-        const inv = invBySched.get(sc.id) || [];
-        const zr: ZoneRow[] = [];
-        
-        if (inv.length > 0) {
-          // Use schedule_inventory when available (ALWAYS prefer this)
-          inv.forEach(si => {
-            const tz = zoneById.get(si.zone_id);
-            const sold = si.sold || 0;
-            const available = si.available || 0;
-            const cap = sold + available; // Correct capacity = sold + available (NOT total_capacity which may be venue-level)
-            zr.push({
-              zone_id: si.zone_id,
-              zone_name: tz?.zone_name || 'Zona',
-              zone_type: tz?.zone_type || 'ga',
-              price: tz?.price || 0,
-              sold,
-              capacity: cap,
-              occupancyPct: cap > 0 ? (sold / cap) * 100 : 0
-            });
-          });
-        } else if (eZon.length > 0) {
-          // Only fallback to event-level zones if NO schedule_inventory exists
-          eZon.forEach(tz => {
-            const cap = (tz.available || 0) + (tz.sold || 0);
-            zr.push({
-              zone_id: (tz as TicketZone & {id:string}).id || '',
-              zone_name: tz.zone_name,
-              zone_type: tz.zone_type || 'ga',
-              price: tz.price,
-              sold: tz.sold || 0,
-              capacity: cap,
-              occupancyPct: cap > 0 ? ((tz.sold || 0) / cap) * 100 : 0
-            });
-          });
-        }
-        
-        const ts = zr.reduce((s,z)=>s+z.sold,0), tc = zr.reduce((s,z)=>s+z.capacity,0);
-        return { id: sc.id, date: sc.date, start_time: sc.start_time, end_time: sc.end_time, status: sc.status, sold: ts, capacity: tc, occupancyPct: tc>0?(ts/tc)*100:0, revenue: revBySched.get(sc.id)||0, zones: zr };
-      });
-      const ts = rows.reduce((s,r)=>s+r.sold,0), tc = rows.reduce((s,r)=>s+r.capacity,0);
-      const fSold = ts || eZon.reduce((s,z)=>s+(z.sold||0),0), fCap = tc || eZon.reduce((s,z)=>s+(z.available||0)+(z.sold||0),0);
-      return { id: evt.id, name: evt.name, status: isPast&&evt.status==='active'?'completed':evt.status, image_url: evt.image_url||'', event_type: evt.event_type||'single', start_date: evt.start_date, venue_id: evt.venue_id, venueName: getVenueName(evt.venue_id, venueMap), venueCity: getVenueCity(evt.venue_id, venueMap), totalSold: fSold, totalCapacity: fCap, revenue: revByEvent.get(evt.id)||0, occupancyPct: fCap>0?(fSold/fCap)*100:0, isPast, schedules: rows };
+      
+      const rows: ScheduleRow[] = eSch.sort((a,b) => (a.date||'').localeCompare(b.date||'')||(a.start_time||'').localeCompare(b.start_time||'')).map(sc => ({
+        id: sc.id, 
+        date: sc.date, 
+        start_time: sc.start_time, 
+        end_time: sc.end_time, 
+        status: sc.status
+      }));
+
+      return { 
+        id: evt.id, 
+        name: evt.name, 
+        status: isPast&&evt.status==='active'?'completed':evt.status, 
+        image_url: evt.image_url||'', 
+        event_type: evt.event_type||'single', 
+        start_date: evt.start_date, 
+        venue_id: evt.venue_id, 
+        venueName: getVenueName(evt.venue_id, venueMap), 
+        venueCity: getVenueCity(evt.venue_id, venueMap),
+        isPast, 
+        schedules: rows,
+        slug: evt.slug,
+        description: evt.description
+      };
     });
-  }, [events, schedules, zones, venueMap, allInv, zoneById, invBySched, revByEvent, revBySched]);
+  }, [events, schedules, venueMap]);
 
   const cities = useMemo(() => { const s = new Set<string>(); cards.forEach(e => { if(e.venueCity) s.add(e.venueCity); }); return [...s].sort(); }, [cards]);
 
@@ -278,12 +364,7 @@ export default function EventsPage() {
 
   if (loading) return (<div className="bg-[#0a0a0a] min-h-[600px] rounded-2xl p-4 sm:p-6"><h1 className="text-xl font-bold text-white mb-6">EVENTOS</h1><Skel/></div>);
 
-  if (selEv) return (<div className="bg-[#0a0a0a] min-h-[600px] rounded-2xl p-4 sm:p-6"><DrillDown event={selEv} onBack={() => setSelId(null)}/></div>);
-
-  const totSold = filtered.reduce((s,e)=>s+e.totalSold,0);
-  const totCap = filtered.reduce((s,e)=>s+e.totalCapacity,0);
-  const totRev = filtered.reduce((s,e)=>s+e.revenue,0);
-  const avgOcc = totCap > 0 ? ((totSold/totCap)*100).toFixed(1)+'%' : '0%';
+  if (selEv) return (<div className="bg-[#0a0a0a] min-h-[600px] rounded-2xl p-4 sm:p-6"><EventDetail event={selEv} onBack={() => setSelId(null)} zones={zones} orders={orders}/></div>);
 
   return (
     <div className="bg-[#0a0a0a] min-h-[600px] rounded-2xl p-4 sm:p-6">
@@ -305,40 +386,31 @@ export default function EventsPage() {
           <button key={t.k} onClick={() => setStatusF(t.k)} className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${statusF===t.k?'bg-white text-black':'text-gray-400 hover:text-white'}`}>{t.l}</button>
         ))}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <div className="bg-[#111] rounded-xl p-3"><p className="text-xs text-gray-500 mb-1">Total Eventos</p><p className="text-lg font-bold text-white">{filtered.length}</p></div>
-        <div className="bg-[#111] rounded-xl p-3"><p className="text-xs text-gray-500 mb-1">Boletos Vendidos</p><p className="text-lg font-bold text-white">{totSold.toLocaleString()}</p></div>
-        <div className="bg-[#111] rounded-xl p-3"><p className="text-xs text-gray-500 mb-1">Revenue Total</p><p className="text-lg font-bold text-white">{fmt(totRev)}</p></div>
-        <div className="bg-[#111] rounded-xl p-3"><p className="text-xs text-gray-500 mb-1">Ocup. Promedio</p><p className="text-lg font-bold text-white">{avgOcc}</p></div>
-      </div>
+      {/* Removed financial KPI cards - now lives in Vista General and Finanzas */}
       <div className="space-y-2">
-        {filtered.map(evt => (
-          <div key={evt.id} onClick={() => setSelId(evt.id)} className="bg-[#111] rounded-xl p-3 sm:p-4 flex gap-3 sm:gap-4 cursor-pointer hover:bg-[#181818] transition-colors group">
-            {evt.image_url ? <img src={evt.image_url} alt="" className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-cover flex-shrink-0"/> : <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-gray-800 flex items-center justify-center text-gray-600 text-xl flex-shrink-0">?</div>}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                <SemEmoji pct={evt.occupancyPct}/>
-                <h3 className="text-sm sm:text-base font-semibold text-white truncate">{evt.name}</h3>
-                <Badge status={evt.status} isPast={evt.isPast}/>
-              </div>
-              <p className="text-xs text-gray-500 truncate">{evt.venueName}{evt.venueCity ? `, ${evt.venueCity}` : ''} · {fmtDate(evt.start_date)}</p>
-              <div className="flex flex-wrap gap-3 sm:gap-4 mt-2 text-xs">
-                <span className="text-gray-400">Vendidos: <span className="text-white font-bold">{evt.totalSold.toLocaleString()}/{evt.totalCapacity.toLocaleString()}</span></span>
-                <span className="text-gray-400">Ocup: <span className={`font-bold ${evt.occupancyPct >= 70 ? 'text-green-400' : evt.occupancyPct >= 30 ? 'text-yellow-400' : 'text-red-400'}`}>{evt.occupancyPct.toFixed(0)}%</span></span>
-                <span className="text-gray-400">Revenue: <span className="text-white font-bold">{fmt(evt.revenue)}</span></span>
-                {evt.schedules.length > 0 && <span className="text-gray-400">Funciones: <span className="text-white font-bold">{evt.schedules.length}</span></span>}
-              </div>
-              {/* Mini semaphore strip for functions */}
-              {evt.schedules.length > 1 && (
-                <div className="flex items-center gap-1 mt-2">
-                  {evt.schedules.slice(0, 20).map(s => <Sem key={s.id} pct={s.occupancyPct} sm/>)}
-                  {evt.schedules.length > 20 && <span className="text-[10px] text-gray-500">+{evt.schedules.length - 20}</span>}
+        {filtered.map(evt => {
+          const nextFunction = evt.schedules.length > 0 
+            ? evt.schedules.find(s => new Date(s.date) >= new Date()) 
+            : null;
+          
+          return (
+            <div key={evt.id} onClick={() => setSelId(evt.id)} className="bg-[#111] rounded-xl p-3 sm:p-4 flex gap-3 sm:gap-4 cursor-pointer hover:bg-[#181818] transition-colors group">
+              {evt.image_url ? <img src={evt.image_url} alt="" className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-cover flex-shrink-0"/> : <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-gray-800 flex items-center justify-center text-gray-600 text-xl flex-shrink-0">?</div>}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                  <h3 className="text-sm sm:text-base font-semibold text-white truncate">{evt.name}</h3>
+                  <Badge status={evt.status} isPast={evt.isPast}/>
                 </div>
-              )}
+                <p className="text-xs text-gray-500 truncate">{evt.venueName}{evt.venueCity ? `, ${evt.venueCity}` : ''}</p>
+                <div className="flex flex-wrap gap-3 sm:gap-4 mt-2 text-xs">
+                  {nextFunction && <span className="text-gray-400">Próxima: <span className="text-white font-medium">{fmtDate(nextFunction.date)}</span></span>}
+                  <span className="text-gray-400">Funciones: <span className="text-white font-medium">{evt.schedules.length}</span></span>
+                </div>
+              </div>
+              <svg className="w-5 h-5 text-gray-600 group-hover:text-gray-400 transition-colors flex-shrink-0 self-center" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
             </div>
-            <svg className="w-5 h-5 text-gray-600 group-hover:text-gray-400 transition-colors flex-shrink-0 self-center" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {filtered.length === 0 && <div className="bg-[#111] rounded-xl p-8 text-center text-gray-500">No hay eventos con estos filtros</div>}
       <EventWizard open={wizardOpen} onClose={() => setWizardOpen(false)} onCreated={() => { toast.success('Evento creado exitosamente'); load(); }}/>
