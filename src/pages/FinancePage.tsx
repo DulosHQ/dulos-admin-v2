@@ -178,6 +178,7 @@ export default function FinancePage() {
         setEvents(eventsData);
         setSchedules(schedulesData);
         setInventory(inventoryData);
+        if (inventoryData.length === 0) console.warn('[Finanzas] schedule_inventory returned 0 rows — vendidos/capacidad will use fallback');
         setDispersions(dispersionsData);
         setCommissions(commissionsData);
         setZones(zonesData);
@@ -337,11 +338,18 @@ export default function FinancePage() {
 
         for (const schedule of eventSchedules) {
           const scheduleInventory = inventory.filter(inv => inv.schedule_id === schedule.id);
-          const sold = scheduleInventory.reduce((sum, inv) => sum + inv.sold, 0);
+          const scheduleOrders = eventOrders.filter(o => o.schedule_id === schedule.id);
+          
+          // Sold: prefer inventory, fallback to order quantity
+          let sold = scheduleInventory.reduce((sum, inv) => sum + inv.sold, 0);
+          if (sold === 0 && scheduleOrders.length > 0) {
+            sold = scheduleOrders.reduce((sum, o) => sum + o.quantity, 0);
+          }
+          
+          // Capacity: from inventory (sold + available = Dulos allocation, NOT venue capacity)
           const capacity = scheduleInventory.reduce((sum, inv) => sum + (inv.sold + inv.available), 0);
           
-          // Calculate revenue for this schedule
-          const scheduleOrders = eventOrders.filter(o => o.schedule_id === schedule.id);
+          // Revenue from orders
           let revenue = 0;
           
           if (scheduleOrders.length > 0) {
