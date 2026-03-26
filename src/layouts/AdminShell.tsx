@@ -31,7 +31,7 @@ export default function AdminShell({ children, user, activeTab, onTabChange, onL
   }, [desktopMode]);
 
   return (
-    <div className="min-h-screen bg-[#fafafa]">
+    <div className="min-h-screen bg-[#0a0a0a]">
       <AdminHeader user={user} onLogout={onLogout} />
       <AdminNav activeTab={activeTab} onTabChange={onTabChange} permissions={user.permissions} />
       <main className="max-w-[1400px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">

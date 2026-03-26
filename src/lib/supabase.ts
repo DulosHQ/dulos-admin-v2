@@ -277,12 +277,41 @@ export interface CustomerHistory {
   event_date: string;
 }
 
-// New table interfaces (empty but ready)
+// Updated Dispersion interface (Liquidaciones)
 export interface Dispersion {
   id: string;
   event_id: string;
-  amount: number;
-  status: string;
+  schedule_id: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  function_date: string | null;
+  gross_revenue: number;
+  discounts: number;
+  refunds: number;
+  net_revenue: number;
+  commission_rate: number;
+  platform_fee: number;
+  ad_spend: number;
+  stripe_fee: number;
+  net_payout: number;
+  status: 'pending' | 'approved' | 'paid';
+  approved_at: string | null;
+  approved_by: string | null;
+  paid_at: string | null;
+  payment_reference: string | null;
+  payment_method: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface AdSpendDaily {
+  id: string;
+  event_id: string;
+  date: string;
+  spend: number;
+  source: string;
+  campaign_id: string | null;
+  synced_at: string | null;
   created_at: string;
 }
 
@@ -898,32 +927,71 @@ export async function fetchEventSectionSeatsForEvent(eventId: string): Promise<(
 
 // ─── Dispersions (Paolo's payout table) ───
 
-export interface DispersionFull {
-  id: string;
-  event_id: string;
-  period_start: string;
-  period_end: string;
-  gross_revenue: number;
-  discounts: number;
-  refunds: number;
-  net_revenue: number;
-  platform_fee: number;
-  ad_spend: number;
-  carried_over: number;
-  net_payout: number;
-  status: string;
-  paid_at: string | null;
-  payment_reference: string | null;
-  notes: string | null;
-  created_at: string;
+export async function fetchAllDispersions(): Promise<Dispersion[]> {
+  try {
+    return await supabaseFetch<Dispersion[]>('dispersions?order=function_date.desc');
+  } catch {
+    return []; // Table may not exist yet
+  }
 }
 
-export async function fetchDispersions(eventId?: string): Promise<DispersionFull[]> {
+export async function fetchDispersionsByEvent(eventId: string): Promise<Dispersion[]> {
+  try {
+    return await supabaseFetch<Dispersion[]>(`dispersions?event_id=eq.${eventId}&order=function_date.desc`);
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchDispersions(eventId?: string): Promise<Dispersion[]> {
   try {
     const filter = eventId ? `&event_id=eq.${eventId}` : '';
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/dispersions?order=created_at.desc${filter}`, { headers });
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/dispersions?order=function_date.desc${filter}`, { headers });
     if (!response.ok) return []; // Table may not exist yet
     return response.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function createDispersion(data: Omit<Dispersion, 'id' | 'created_at'>): Promise<Dispersion | null> {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/dispersions`, {
+      method: 'POST',
+      headers: { ...headers, 'Prefer': 'return=representation' },
+      body: JSON.stringify({
+        ...data,
+        created_at: new Date().toISOString(),
+      }),
+    });
+    if (!response.ok) return null;
+    const result = await response.json();
+    return Array.isArray(result) ? result[0] : result;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateDispersion(id: string, data: Partial<Omit<Dispersion, 'id' | 'created_at'>>): Promise<boolean> {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/dispersions?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Prefer': 'return=representation' },
+      body: JSON.stringify(data),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchAdSpendDaily(eventId: string, startDate?: string, endDate?: string): Promise<AdSpendDaily[]> {
+  try {
+    let filter = `event_id=eq.${eventId}`;
+    if (startDate && endDate) {
+      filter += `&date=gte.${startDate}&date=lte.${endDate}`;
+    }
+    return await supabaseFetch<AdSpendDaily[]>(`ad_spend_daily?${filter}&order=date.desc`);
   } catch {
     return [];
   }

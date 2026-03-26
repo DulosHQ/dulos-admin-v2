@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import SummaryPage from "@/pages/SummaryPage";
 import FinancePage from "@/pages/FinancePage";
+import LiquidacionesPage from "@/pages/LiquidacionesPage";
 import EventsPage from "@/pages/EventsPage";
 import OpsPage from "@/pages/OpsPage";
 import AdminPage from "@/pages/AdminPage";
@@ -99,6 +100,7 @@ export default function Home() {
   const pages: Record<string, React.ReactNode> = {
     resumen: <SummaryPage />,
     finanzas: <FinancePage />,
+    liquidaciones: <LiquidacionesPage />,
     eventos: <EventsPage />,
     operaciones: <OpsPage />,
     admin: <AdminPage />,

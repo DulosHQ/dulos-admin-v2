@@ -9,6 +9,7 @@ interface Tab {
 const TABS: Tab[] = [
   { id: "resumen", label: "Vista General", permissions: ["finance.read", "finance.stats.global"] },
   { id: "finanzas", label: "Finanzas", permissions: ["finance.read", "inventory.read", "access.stats"] },
+  { id: "liquidaciones", label: "Liquidaciones", permissions: ["finance.read", "finance.manage"] },
   { id: "eventos", label: "Eventos", permissions: ["project.read", "project.manage", "event.read"] },
   { id: "operaciones", label: "Operaciones", permissions: ["ticket.scan", "marketing.codes.manage"] },
   { id: "admin", label: "Configuración", permissions: ["team.manage", "sys.config", "sys.audit"] },
@@ -26,7 +27,7 @@ export default function AdminNav({ activeTab, onTabChange, permissions }: AdminN
   );
 
   return (
-    <nav className="bg-white">
+    <nav className="bg-[#111]">
       <div className="max-w-[1400px] mx-auto px-3 sm:px-8">
         <div className="flex gap-4 sm:gap-8 overflow-x-auto scrollbar-hide justify-start sm:justify-center py-1">
           {visibleTabs.map(tab => (
@@ -36,7 +37,7 @@ export default function AdminNav({ activeTab, onTabChange, permissions }: AdminN
               className={`relative px-2 py-4 text-sm font-medium whitespace-nowrap transition-all ${
                 activeTab === tab.id
                   ? "text-[#EF4444]"
-                  : "text-gray-500 hover:text-gray-800"
+                  : "text-gray-400 hover:text-white"
               }`}
             >
               {tab.label}

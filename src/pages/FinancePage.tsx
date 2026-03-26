@@ -20,7 +20,7 @@ import {
   DulosEvent,
   Schedule,
   ScheduleInventory,
-  DispersionFull,
+  Dispersion,
   EventCommission,
   TicketZone,
 } from '../lib/supabase';
@@ -142,7 +142,7 @@ export default function FinancePage() {
   const [events, setEvents] = useState<DulosEvent[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [inventory, setInventory] = useState<ScheduleInventory[]>([]);
-  const [dispersions, setDispersions] = useState<DispersionFull[]>([]);
+  const [dispersions, setDispersions] = useState<Dispersion[]>([]);
   const [commissions, setCommissions] = useState<EventCommission[]>([]);
   const [zones, setZones] = useState<TicketZone[]>([]);
   const [venueMap, setVenueMap] = useState<Map<string, any>>(new Map());
