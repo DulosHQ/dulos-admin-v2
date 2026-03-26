@@ -658,7 +658,7 @@ export default function FinancePage() {
                     <th className="px-4 py-3 text-left">Fecha</th>
                     <th className="px-4 py-3 text-left">Hora</th>
                     <th className="px-4 py-3 text-right">Vendidos</th>
-                    <th className="px-4 py-3 text-right">Capacidad</th>
+                    <th className="px-4 py-3 text-right">Inventario</th>
                     <th className="px-4 py-3 text-right">Ocupación %</th>
                     <th className="px-4 py-3 text-right">Revenue</th>
                   </tr>
