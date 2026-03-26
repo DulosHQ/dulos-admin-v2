@@ -67,7 +67,8 @@ export default function AdsPage() {
       const response = await fetch(url);
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch insights: ${response.status}`);
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(errBody.detail || `Failed to fetch insights: ${response.status}`);
       }
 
       const data: MetaInsightsResponse = await response.json();

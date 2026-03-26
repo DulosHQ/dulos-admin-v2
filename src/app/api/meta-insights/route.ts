@@ -65,8 +65,14 @@ export async function GET(request: NextRequest) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Meta API error:', response.status, errorText);
+      // Parse Meta error for useful message
+      let metaMessage = '';
+      try {
+        const metaErr = JSON.parse(errorText);
+        metaMessage = metaErr?.error?.message || errorText.slice(0, 200);
+      } catch { metaMessage = errorText.slice(0, 200); }
       return NextResponse.json(
-        { error: `Meta API error: ${response.status}` }, 
+        { error: `Meta API error: ${response.status}`, detail: metaMessage }, 
         { status: response.status }
       );
     }
