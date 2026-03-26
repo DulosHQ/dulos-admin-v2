@@ -5,6 +5,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import SummaryPage from "@/pages/SummaryPage";
 import FinancePage from "@/pages/FinancePage";
 import LiquidacionesPage from "@/pages/LiquidacionesPage";
+import AdsPage from "@/pages/AdsPage";
 import EventsPage from "@/pages/EventsPage";
 import OpsPage from "@/pages/OpsPage";
 import AdminPage from "@/pages/AdminPage";
@@ -101,6 +102,7 @@ export default function Home() {
     resumen: <SummaryPage />,
     finanzas: <FinancePage />,
     liquidaciones: <LiquidacionesPage />,
+    ads: <AdsPage />,
     eventos: <EventsPage />,
     operaciones: <OpsPage />,
     admin: <AdminPage />,
