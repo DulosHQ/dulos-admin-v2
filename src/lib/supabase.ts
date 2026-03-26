@@ -1210,21 +1210,23 @@ export async function fetchWarRoomEvents(): Promise<WarRoomEvent[]> {
       const eventSchedules = schedules.filter(s => s.event_id === event.id);
       const nextDate = eventSchedules.length > 0 ? eventSchedules[0].date : null;
       
-      // Calculate occupancy for this event
+      // Calculate occupancy for NEXT FUNCTION only (not aggregate across all functions)
+      // For recurring events, each function's health matters independently
       let totalSold = 0;
       let totalCapacity = 0;
+      const nextSchedule = eventSchedules.length > 0 ? eventSchedules[0] : null;
       
-      eventSchedules.forEach(schedule => {
-        const schedInventory = inventory.filter(inv => inv.schedule_id === schedule.id);
-        schedInventory.forEach(inv => {
+      if (nextSchedule) {
+        const nextInv = inventory.filter(inv => inv.schedule_id === nextSchedule.id);
+        nextInv.forEach(inv => {
           totalSold += inv.sold;
           totalCapacity += inv.total_capacity;
         });
-      });
+      }
 
       const occupancyPct = totalCapacity > 0 ? (totalSold / totalCapacity) * 100 : 0;
       
-      // Calculate revenue for this event
+      // Calculate revenue for this event (all orders, not just next function)
       const eventOrders = orders.filter(o => o.event_id === event.id);
       const revenue = eventOrders.reduce((sum, o) => 
         sum + (o.total_price - (o.discount_amount || 0)), 0
@@ -1261,14 +1263,25 @@ export async function fetchWarRoomEvents(): Promise<WarRoomEvent[]> {
 
       const salesTrend = Object.values(dailySales);
 
-      // Calculate status based on expected pace
+      // Calculate status based on expected pace for NEXT FUNCTION
+      // Edge cases:
+      // - No sales yet → 🟡 (neutral, not enough data to judge)
+      // - Event past due (daysUntilEvent <= 0) → use occupancy directly
+      // - Low occupancy close to date → 🔴
       let status: 'on_track' | 'slow' | 'critical' = 'on_track';
       
       if (nextDate && eventSchedules.length > 0) {
         const daysUntilEvent = Math.ceil((new Date(nextDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
         const firstOrderDate = eventOrders.sort((a, b) => new Date(a.purchased_at).getTime() - new Date(b.purchased_at).getTime())[0]?.purchased_at;
         
-        if (firstOrderDate && daysUntilEvent > 0) {
+        if (!firstOrderDate || eventOrders.length === 0) {
+          // No sales yet — neutral, can't evaluate pace
+          status = 'slow';
+        } else if (daysUntilEvent <= 0) {
+          // Event is today or past — judge by absolute occupancy
+          if (occupancyPct < 50) status = 'critical';
+          else if (occupancyPct < 80) status = 'slow';
+        } else {
           const daysSinceFirstSale = Math.ceil((new Date().getTime() - new Date(firstOrderDate).getTime()) / (1000 * 60 * 60 * 24));
           const totalDays = daysSinceFirstSale + daysUntilEvent;
           const expectedPace = totalDays > 0 ? (daysSinceFirstSale / totalDays) * 100 : 100;
