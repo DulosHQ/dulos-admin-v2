@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -57,6 +57,13 @@ interface ZoneBreakdown {
   percentage: number;
 }
 
+interface ScheduleZoneBreakdown {
+  zone: string;
+  sold: number;
+  capacity: number;
+  revenue: number;
+}
+
 interface ScheduleBreakdown {
   date: string;
   time: string;
@@ -64,6 +71,7 @@ interface ScheduleBreakdown {
   capacity: number;
   occupancy: number;
   revenue: number;
+  zones: ScheduleZoneBreakdown[];
 }
 
 interface SalesTrendPoint {
@@ -136,6 +144,7 @@ export default function FinancePage() {
   const [eventFilter, setEventFilter] = useState<string>('all');
   const [drillDownEventId, setDrillDownEventId] = useState<string | null>(null);
   const [drillDownData, setDrillDownData] = useState<DrillDownData | null>(null);
+  const [expandedSchedules, setExpandedSchedules] = useState<Set<number>>(new Set());
   
   // Raw data
   const [orders, setOrders] = useState<Order[]>([]);
@@ -364,6 +373,24 @@ export default function FinancePage() {
             revenue = sold * avgRevenuePerTicket;
           }
 
+          // Per-zone breakdown for this schedule
+          const zoneBreakdownForSchedule: ScheduleZoneBreakdown[] = [];
+          for (const zone of eventZones) {
+            const zoneInv = scheduleInventory.find(inv => inv.zone_id === zone.zone_name || inv.zone_id === (zone as any).id);
+            const zoneSold = zoneInv ? zoneInv.sold : scheduleOrders.filter(o => o.zone_name === zone.zone_name).reduce((sum, o) => sum + o.quantity, 0);
+            const zoneCap = zoneInv ? (zoneInv.sold + zoneInv.available) : (zone.total_capacity || 0);
+            const zoneRevenue = scheduleOrders.filter(o => o.zone_name === zone.zone_name).reduce((sum, o) => sum + (o.total_price - (o.discount_amount || 0)), 0);
+            
+            if (zoneSold > 0 || zoneCap > 0) {
+              zoneBreakdownForSchedule.push({
+                zone: zone.zone_name,
+                sold: zoneSold,
+                capacity: zoneCap,
+                revenue: zoneRevenue,
+              });
+            }
+          }
+
           scheduleBreakdown.push({
             date: fmtDate(schedule.date),
             time: fmtTime(schedule.start_time),
@@ -371,6 +398,7 @@ export default function FinancePage() {
             capacity,
             occupancy: capacity > 0 ? (sold / capacity) * 100 : 0,
             revenue,
+            zones: zoneBreakdownForSchedule,
           });
         }
 
@@ -520,9 +548,10 @@ export default function FinancePage() {
                 {eventFinanceData.map((event) => (
                   <tr
                     key={event.id}
-                    onClick={() => setDrillDownEventId(
-                      drillDownEventId === event.id ? null : event.id
-                    )}
+                    onClick={() => {
+                      setDrillDownEventId(drillDownEventId === event.id ? null : event.id);
+                      setExpandedSchedules(new Set());
+                    }}
                     className="hover:bg-gray-900/50 cursor-pointer transition-colors"
                   >
                     <td className="px-4 py-3">
@@ -633,24 +662,55 @@ export default function FinancePage() {
                 </thead>
                 <tbody className="divide-y divide-gray-800">
                   {drillDownData.schedules.map((schedule, index) => (
-                    <tr key={index}>
-                      <td className="px-4 py-3 text-white font-medium">{schedule.date}</td>
-                      <td className="px-4 py-3 text-gray-300">{schedule.time}</td>
-                      <td className="px-4 py-3 text-right text-white font-medium">{schedule.sold}</td>
-                      <td className="px-4 py-3 text-right text-gray-300">{schedule.capacity}</td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`font-medium ${
-                          schedule.occupancy >= 80 ? 'text-green-400' :
-                          schedule.occupancy >= 60 ? 'text-yellow-400' :
-                          'text-red-400'
-                        }`}>
-                          {schedule.occupancy.toFixed(1)}%
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right text-green-400 font-medium">
-                        {fmtCurrency(schedule.revenue)}
-                      </td>
-                    </tr>
+                    <React.Fragment key={index}>
+                      <tr 
+                        className={`cursor-pointer hover:bg-gray-800 transition-colors ${expandedSchedules.has(index) ? 'bg-gray-800/50' : ''}`}
+                        onClick={() => {
+                          setExpandedSchedules(prev => {
+                            const next = new Set(prev);
+                            next.has(index) ? next.delete(index) : next.add(index);
+                            return next;
+                          });
+                        }}
+                      >
+                        <td className="px-4 py-3 text-white font-medium">
+                          <span className="mr-2 text-gray-500">{expandedSchedules.has(index) ? '▼' : '▶'}</span>
+                          {schedule.date}
+                        </td>
+                        <td className="px-4 py-3 text-gray-300">{schedule.time}</td>
+                        <td className="px-4 py-3 text-right text-white font-medium">{schedule.sold}</td>
+                        <td className="px-4 py-3 text-right text-gray-300">{schedule.capacity}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={`font-medium ${
+                            schedule.occupancy >= 80 ? 'text-green-400' :
+                            schedule.occupancy >= 60 ? 'text-yellow-400' :
+                            'text-red-400'
+                          }`}>
+                            {schedule.occupancy.toFixed(1)}%
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right text-green-400 font-medium">
+                          {fmtCurrency(schedule.revenue)}
+                        </td>
+                      </tr>
+                      {expandedSchedules.has(index) && schedule.zones.length > 0 && (
+                        schedule.zones.map((zone, zi) => (
+                          <tr key={`${index}-z${zi}`} className="bg-gray-900/50">
+                            <td className="px-4 py-2 pl-10 text-gray-400 text-sm" colSpan={2}>
+                              {zone.zone}
+                            </td>
+                            <td className="px-4 py-2 text-right text-gray-300 text-sm">{zone.sold}</td>
+                            <td className="px-4 py-2 text-right text-gray-500 text-sm">{zone.capacity}</td>
+                            <td className="px-4 py-2 text-right text-gray-500 text-sm">
+                              {zone.capacity > 0 ? `${((zone.sold / zone.capacity) * 100).toFixed(1)}%` : '—'}
+                            </td>
+                            <td className="px-4 py-2 text-right text-green-400/70 text-sm">
+                              {fmtCurrency(zone.revenue)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
