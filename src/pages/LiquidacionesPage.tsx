@@ -18,6 +18,7 @@ import {
   Schedule,
   Order,
   EventCommission,
+  AdSpendDaily,
 } from '../lib/supabase';
 
 type StatusFilter = 'all' | 'pending' | 'approved' | 'paid';
@@ -234,13 +235,48 @@ export default function LiquidacionesPage() {
           const platform_fee = net_revenue * commission_rate;
           const stripe_fee = scheduleOrders.reduce((sum, o) => sum + (o.stripe_fee || 0), 0);
           
-          // Calculate ad spend for the week
+          // Calculate ad spend for the week with proration
           const scheduleDate = new Date(schedule.date);
           const weekStart = getWeekStart(scheduleDate);
           const weekEnd = getWeekEnd(scheduleDate);
+          const weekStartStr = weekStart.toISOString().split('T')[0];
+          const weekEndStr = weekEnd.toISOString().split('T')[0];
           
-          // For now, ad spend is 0 (will be filled manually or via API later)
-          const ad_spend = 0;
+          // Fetch ad spend for this event's week
+          const weekAdSpend = await fetchAdSpendDaily(
+            event.id, weekStartStr, weekEndStr
+          );
+          const totalWeekSpend = weekAdSpend.reduce((sum: number, a: AdSpendDaily) => sum + a.spend, 0);
+          
+          // Check for other functions of same event in same week (for proration)
+          let ad_spend = totalWeekSpend;
+          if (totalWeekSpend > 0) {
+            const samWeekFunctions = eligibleSchedules.filter(s => {
+              if (s.event_id !== schedule.event_id) return false;
+              const sDate = new Date(s.date);
+              return sDate >= weekStart && sDate <= weekEnd;
+            });
+            
+            if (samWeekFunctions.length > 1) {
+              // Prorate by revenue proportion
+              const allWeekRevenues = samWeekFunctions.map(sf => {
+                const sfOrders = orders.filter(o => 
+                  o.schedule_id === sf.id && 
+                  ['completed', 'paid'].includes(o.payment_status)
+                );
+                return sfOrders.reduce((sum, o) => sum + o.total_price - (o.discount_amount || 0), 0);
+              });
+              const totalWeekRevenue = allWeekRevenues.reduce((a, b) => a + b, 0);
+              const thisIdx = samWeekFunctions.findIndex(sf => sf.id === schedule.id);
+              
+              if (totalWeekRevenue > 0) {
+                ad_spend = totalWeekSpend * (allWeekRevenues[thisIdx] / totalWeekRevenue);
+              } else {
+                // Equal split if no revenue
+                ad_spend = totalWeekSpend / samWeekFunctions.length;
+              }
+            }
+          }
           
           const net_payout = net_revenue - platform_fee - stripe_fee - ad_spend;
 
