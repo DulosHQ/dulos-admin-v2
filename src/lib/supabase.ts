@@ -921,7 +921,9 @@ export interface DispersionFull {
 export async function fetchDispersions(eventId?: string): Promise<DispersionFull[]> {
   try {
     const filter = eventId ? `&event_id=eq.${eventId}` : '';
-    return await supabaseFetch<DispersionFull[]>(`dispersions?order=created_at.desc${filter}`);
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/dispersions?order=created_at.desc${filter}`, { headers });
+    if (!response.ok) return []; // Table may not exist yet
+    return response.json();
   } catch {
     return [];
   }
@@ -1138,7 +1140,7 @@ export async function fetchWarRoomKPIs(): Promise<WarRoomKPIs> {
       supabaseFetch<DulosEvent[]>('events?status=eq.active'),
       supabaseFetch<Schedule[]>(`schedules?date=gte.${today}&status=eq.active`),
       supabaseFetch<Order[]>('orders?payment_status=in.(completed,paid)'),
-      supabaseFetch<DispersionFull[]>('dispersions')
+      fetchDispersions(),
     ]);
 
     // Active events = events with upcoming functions
@@ -1198,7 +1200,7 @@ export async function fetchWarRoomEvents(): Promise<WarRoomEvent[]> {
       supabaseFetch<Schedule[]>(`schedules?date=gte.${today}&status=eq.active&order=date.asc`),
       supabaseFetch<ScheduleInventory[]>('schedule_inventory'),
       supabaseFetch<Order[]>('orders?payment_status=in.(completed,paid)'),
-      supabaseFetch<DispersionFull[]>('dispersions'),
+      fetchDispersions(),
       getVenueMap()
     ]);
 
