@@ -610,7 +610,8 @@ export default function FinancePage() {
       {/* Event Drill-Down */}
       {drillDownEventId && drillDownData && (
         <div className="space-y-6">
-          {/* Zone Breakdown */}
+          {/* Zone Breakdown — only for single-function events */}
+          {drillDownData.schedules.length <= 1 && (
           <div className="bg-[#111] rounded-xl">
             <div className="p-4 border-b border-gray-800">
               <h3 className="text-lg font-bold text-white">Desglose por Zona</h3>
@@ -641,12 +642,14 @@ export default function FinancePage() {
               </table>
             </div>
           </div>
+          )}
 
-          {/* Schedule Breakdown */}
+          {/* Schedule Breakdown — only for recurring (multi-function) events */}
+          {drillDownData.schedules.length > 1 && (
           <div className="bg-[#111] rounded-xl">
             <div className="p-4 border-b border-gray-800">
               <h3 className="text-lg font-bold text-white">Desglose por Función</h3>
-              <p className="text-xs text-gray-400">Ventas por fecha y función</p>
+              <p className="text-xs text-gray-400">Click en una función para ver desglose por zona</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -716,6 +719,7 @@ export default function FinancePage() {
               </table>
             </div>
           </div>
+          )}
 
           {/* Sales Trend Chart */}
           {drillDownData.salesTrend.length > 0 && (
