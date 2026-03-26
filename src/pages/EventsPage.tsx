@@ -19,6 +19,7 @@ import {
   Venue,
 } from '../lib/supabase';
 import FunctionDetail from './FunctionDetail';
+import EventWizard from './EventWizard';
 
 /* ─── Types ─── */
 interface EventCard {
@@ -168,6 +169,7 @@ export default function EventsPage() {
   const [statusF, setStatusF] = useState<StatusFilter>('all');
   const [cityF, setCityF] = useState('');
   const [selId, setSelId] = useState<string | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -233,7 +235,13 @@ export default function EventsPage() {
   return (
     <div className="bg-[#0a0a0a] min-h-[600px] rounded-2xl p-4 sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-        <h1 className="text-xl font-bold text-white">EVENTOS</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold text-white">EVENTOS</h1>
+          <button onClick={() => setWizardOpen(true)} className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors flex items-center gap-1.5">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
+            Crear Evento
+          </button>
+        </div>
         <div className="flex gap-2 items-center flex-wrap">
           <input type="text" placeholder="Buscar evento..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 min-w-[140px] rounded-lg border border-gray-700 bg-[#111] px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"/>
           {cities.length > 1 && <select value={cityF} onChange={e => setCityF(e.target.value)} className="rounded-lg border border-gray-700 bg-[#111] px-3 py-2 text-sm text-white focus:border-red-500 focus:outline-none"><option value="">Todas las ciudades</option>{cities.map(c => <option key={c} value={c}>{c}</option>)}</select>}
@@ -280,6 +288,7 @@ export default function EventsPage() {
         ))}
       </div>
       {filtered.length === 0 && <div className="bg-[#111] rounded-xl p-8 text-center text-gray-500">No hay eventos con estos filtros</div>}
+      <EventWizard open={wizardOpen} onClose={() => setWizardOpen(false)} onCreated={() => { toast.success('Evento creado exitosamente'); load(); }}/>
     </div>
   );
 }
