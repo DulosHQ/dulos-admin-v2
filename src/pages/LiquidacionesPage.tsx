@@ -88,7 +88,7 @@ function StatusBadge({ status }: { status: string }) {
   };
 
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800'}`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${colors[status as keyof typeof colors] || 'bg-gray-800 text-gray-300'}`}>
       {icons[status as keyof typeof icons]} {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   );

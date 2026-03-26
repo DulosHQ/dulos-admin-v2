@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'EAANAsa24AVUBQ1bZBMclLvKKyTk5ahoZC1PYv5egjolOWgvhgteoGHB5ZCX00vGz7RhK7c2m6tvhx9k1Pr33OWyWhvKGw6OxROeS8adazhjT8df6d37l9oKZCJCKNF5yaAzJiRrYyNaJzrgDo2w9PD6XJ7IU1gZAyXwX6LgSePVK4nciwGaZBVaBU6GD3ZAxZCXHWAZDZD';
+const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || '';
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const AD_ACCOUNT = 'act_1372745737889888';
 
@@ -14,6 +14,10 @@ export async function GET(request: NextRequest) {
 
     if (!adminKeyCookie && (!keyParam || keyParam !== ADMIN_SECRET)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!META_ACCESS_TOKEN) {
+      return NextResponse.json({ error: 'META_ACCESS_TOKEN not configured' }, { status: 500 });
     }
 
     // Parse query parameters

@@ -141,7 +141,7 @@ function EventDetail({ event: ev, onBack, zones, orders }: { event: EventCard; o
           {k:'zonas' as EventTab, l:'Zonas y Precios'},
           {k:'compradores' as EventTab, l:'Compradores'}
         ]).map(t => (
-          <button key={t.k} onClick={() => setActiveTab(t.k)} className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${activeTab===t.k?'bg-white text-black':'text-gray-400 hover:text-white'}`}>{t.l}</button>
+          <button key={t.k} onClick={() => setActiveTab(t.k)} className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${activeTab===t.k?'bg-[#EF4444] text-white':'text-gray-400 hover:text-white'}`}>{t.l}</button>
         ))}
       </div>
 
@@ -383,7 +383,7 @@ export default function EventsPage() {
       </div>
       <div className="flex gap-1 rounded-lg bg-[#111] p-1 w-fit mb-4">
         {([{k:'all' as StatusFilter,l:'Todos'},{k:'active' as StatusFilter,l:'Activos'},{k:'completed' as StatusFilter,l:'Finalizados'},{k:'past' as StatusFilter,l:'Pasados'}]).map(t => (
-          <button key={t.k} onClick={() => setStatusF(t.k)} className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${statusF===t.k?'bg-white text-black':'text-gray-400 hover:text-white'}`}>{t.l}</button>
+          <button key={t.k} onClick={() => setStatusF(t.k)} className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${statusF===t.k?'bg-[#EF4444] text-white':'text-gray-400 hover:text-white'}`}>{t.l}</button>
         ))}
       </div>
       {/* Removed financial KPI cards - now lives in Vista General and Finanzas */}

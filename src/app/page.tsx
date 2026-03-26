@@ -81,17 +81,17 @@ export default function Home() {
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
+      <div className="min-h-screen bg-[#0a0a0a] p-4">
         <div className="max-w-7xl mx-auto space-y-4 animate-pulse">
-          <div className="h-16 bg-gray-200 rounded-lg"></div>
+          <div className="h-16 bg-gray-800 rounded-lg"></div>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             {[1,2,3,4,5].map((i) => (
-              <div key={i} className="h-20 bg-gray-200 rounded-lg"></div>
+              <div key={i} className="h-20 bg-gray-800 rounded-lg"></div>
             ))}
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="h-40 bg-gray-200 rounded-lg"></div>
-            <div className="h-40 bg-gray-200 rounded-lg"></div>
+            <div className="h-40 bg-gray-800 rounded-lg"></div>
+            <div className="h-40 bg-gray-800 rounded-lg"></div>
           </div>
         </div>
       </div>

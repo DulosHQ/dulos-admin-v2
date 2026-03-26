@@ -74,12 +74,12 @@ function ShowRow({ show }: { show: Show }) {
   const emoji = show.emoji || '🎭';
 
   return (
-    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 border-b border-gray-100 gap-4">
+    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 border-b border-gray-800 gap-4">
       {/* Left: Event info */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <span className="text-2xl flex-shrink-0">{emoji}</span>
         <div className="min-w-0">
-          <p className="font-semibold text-gray-900 truncate">{show.name}</p>
+          <p className="font-semibold text-white truncate">{show.name}</p>
           <p className="text-sm text-gray-500">{show.venue}</p>
           <p className="text-xs text-gray-400 mt-0.5">{formatDate(show.date)}</p>
         </div>
@@ -92,7 +92,7 @@ function ShowRow({ show }: { show: Show }) {
             {show.occupancy}% ocupado
           </span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div className="w-full bg-gray-700 rounded-full h-2">
           <div
             className={`h-2 rounded-full transition-all ${getOccupancyColor(show.occupancy)}`}
             style={{ width: `${Math.min(show.occupancy, 100)}%` }}
@@ -103,7 +103,7 @@ function ShowRow({ show }: { show: Show }) {
       {/* Right: Remaining + Badge */}
       <div className="flex items-center gap-3 flex-shrink-0">
         <div className="text-right">
-          <p className="text-sm font-medium text-gray-900">
+          <p className="text-sm font-medium text-white">
             {show.remaining.toLocaleString('es-MX')} restantes
           </p>
         </div>
@@ -116,8 +116,8 @@ function ShowRow({ show }: { show: Show }) {
 export default function UpcomingShows({ shows }: UpcomingShowsProps) {
   if (!shows || shows.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="bg-[#111] rounded-xl shadow-sm border border-gray-800 p-6">
+        <h2 className="text-lg font-semibold text-white mb-4">
           Funciones Próximas (48h)
         </h2>
         <p className="text-gray-500 text-center py-8">
@@ -128,9 +128,9 @@ export default function UpcomingShows({ shows }: UpcomingShowsProps) {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div className="bg-[#111] rounded-xl shadow-sm border border-gray-800 p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">
+        <h2 className="text-lg font-semibold text-white">
           Funciones Próximas (48h)
         </h2>
         <span className="text-sm text-gray-500">

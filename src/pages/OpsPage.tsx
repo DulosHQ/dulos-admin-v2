@@ -403,19 +403,19 @@ export default function OpsPage() {
 
   if (loading) return (
     <div className="space-y-3 animate-pulse">
-      <div className="bg-gray-200 rounded-xl h-64" />
-      <div className="bg-white rounded-lg p-3 sm:p-4 space-y-3">
-        <div className="h-4 bg-gray-200 rounded w-1/3" />
-        <div className="h-10 bg-gray-100 rounded" />
+      <div className="bg-gray-700 rounded-xl h-64" />
+      <div className="bg-[#111] rounded-lg p-3 sm:p-4 space-y-3">
+        <div className="h-4 bg-gray-700 rounded w-1/3" />
+        <div className="h-10 bg-gray-800 rounded" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <div className="bg-white rounded-lg p-3 sm:p-4 space-y-2">
-          <div className="h-4 bg-gray-200 rounded w-1/4" />
-          {[1,2,3,4,5].map(i => <div key={i} className="h-6 bg-gray-100 rounded" />)}
+        <div className="bg-[#111] rounded-lg p-3 sm:p-4 space-y-2">
+          <div className="h-4 bg-gray-700 rounded w-1/4" />
+          {[1,2,3,4,5].map(i => <div key={i} className="h-6 bg-gray-800 rounded" />)}
         </div>
-        <div className="bg-white rounded-lg p-3 sm:p-4 space-y-2">
-          <div className="h-4 bg-gray-200 rounded w-1/4" />
-          {[1,2,3].map(i => <div key={i} className="h-8 bg-gray-100 rounded" />)}
+        <div className="bg-[#111] rounded-lg p-3 sm:p-4 space-y-2">
+          <div className="h-4 bg-gray-700 rounded w-1/4" />
+          {[1,2,3].map(i => <div key={i} className="h-8 bg-gray-800 rounded" />)}
         </div>
       </div>
     </div>
@@ -424,16 +424,16 @@ export default function OpsPage() {
   return (
     <div className="space-y-3">
       {/* Sub-tabs Navigation */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div className="flex border-b border-gray-200">
+      <div className="bg-[#111] rounded-lg  overflow-hidden">
+        <div className="flex border-b border-gray-800">
           {['escaneo', 'clientes', 'gestion'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${
                 activeTab === tab
-                  ? 'border-[#EF4444] text-[#EF4444] bg-red-50'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-[#EF4444] text-[#EF4444] bg-red-500/10'
+                  : 'border-transparent text-gray-500 hover:text-gray-300'
               }`}
             >
               {tab === 'escaneo' ? `Escaneo (${checkins.length})` :
@@ -468,19 +468,19 @@ export default function OpsPage() {
                     onChange={e => setManualTicket(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleManualScan()}
                     placeholder="TKT-2026-0001 o token..."
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
+                    className="flex-1 px-3 py-2 border border-gray-800 rounded-lg text-xs focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
                   />
                   <button onClick={handleManualScan} className="px-3 py-2 bg-[#EF4444] text-white rounded-lg text-xs font-bold hover:bg-[#c5303c] transition-colors whitespace-nowrap">Validar</button>
-                  <button onClick={cameraActive ? stopCamera : startCamera} className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-50 whitespace-nowrap">
+                  <button onClick={cameraActive ? stopCamera : startCamera} className="px-3 py-2 border border-gray-800 rounded-lg text-xs font-bold text-gray-400 hover:bg-[#0d0d0d] whitespace-nowrap">
                     {cameraActive ? '✕ Cerrar' : '📷 QR'}
                   </button>
                 </div>
                 {/* Inline stats */}
                 <div className="flex gap-2 text-[10px] font-bold items-center flex-shrink-0">
-                  <span className="bg-gray-100 px-2 py-1.5 rounded">{checkins.length} check-ins</span>
-                  <span className="bg-green-50 text-green-700 px-2 py-1.5 rounded">{totalOk} ✓</span>
-                  <span className="bg-red-50 text-red-600 px-2 py-1.5 rounded">{totalFail} ✗</span>
-                  <span className="bg-gray-50 text-gray-500 px-2 py-1.5 rounded">{avgPerHour}/h</span>
+                  <span className="bg-gray-800 px-2 py-1.5 rounded">{checkins.length} check-ins</span>
+                  <span className="bg-green-500/10 text-green-700 px-2 py-1.5 rounded">{totalOk} ✓</span>
+                  <span className="bg-red-500/10 text-red-400 px-2 py-1.5 rounded">{totalFail} ✗</span>
+                  <span className="bg-[#0d0d0d] text-gray-500 px-2 py-1.5 rounded">{avgPerHour}/h</span>
                 </div>
               </div>
 
@@ -494,7 +494,7 @@ export default function OpsPage() {
               </div>
 
               {cameraError && !cameraActive && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
+                <div className="bg-yellow-500/10 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
                   <span className="text-yellow-500 text-lg flex-shrink-0">⚠️</span>
                   <div>
                     <p className="text-xs font-bold text-yellow-700">Cámara</p>
@@ -505,29 +505,29 @@ export default function OpsPage() {
               )}
 
               {scanResult && (
-                <div className={`p-2 rounded-lg text-xs font-bold ${scanResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                <div className={`p-2 rounded-lg text-xs font-bold ${scanResult.ok ? 'bg-green-500/10 text-green-700' : 'bg-red-500/10 text-red-700'}`}>
                   {scanResult.ok ? '✅' : '❌'} {scanResult.msg}
                 </div>
               )}
 
               {/* Ticket inventory — compact inline */}
               <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
-                <span className="flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded">● Válidos: {ticketsByStatus['valid'] || 0}</span>
-                <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded">● Usados: {ticketsByStatus['used'] || 0}</span>
-                <span className="flex items-center gap-1 bg-yellow-50 text-yellow-700 px-2 py-1 rounded">● Pendientes: {ticketsByStatus['pending'] || 0}</span>
-                <span className="flex items-center gap-1 bg-red-50 text-red-600 px-2 py-1 rounded">● Cancelados: {ticketsByStatus['cancelled'] || 0}</span>
+                <span className="flex items-center gap-1 bg-green-500/10 text-green-700 px-2 py-1 rounded">● Válidos: {ticketsByStatus['valid'] || 0}</span>
+                <span className="flex items-center gap-1 bg-blue-500/10 text-blue-700 px-2 py-1 rounded">● Usados: {ticketsByStatus['used'] || 0}</span>
+                <span className="flex items-center gap-1 bg-yellow-500/10 text-yellow-700 px-2 py-1 rounded">● Pendientes: {ticketsByStatus['pending'] || 0}</span>
+                <span className="flex items-center gap-1 bg-red-500/10 text-red-400 px-2 py-1 rounded">● Cancelados: {ticketsByStatus['cancelled'] || 0}</span>
               </div>
 
               {/* Check-ins History Table */}
-              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                <div className="px-3 py-2 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="bg-[#111] rounded-lg  overflow-hidden">
+                <div className="px-3 py-2 border-b border-gray-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <h3 className="text-sm font-extrabold">Historial de Check-ins</h3>
                   <div className="flex gap-2">
-                    <select value={filtroEvento} onChange={e => { setFiltroEvento(e.target.value); setCheckinPage(0) }} className="px-2 py-1 border border-gray-200 rounded text-xs flex-1 sm:flex-none">
+                    <select value={filtroEvento} onChange={e => { setFiltroEvento(e.target.value); setCheckinPage(0) }} className="px-2 py-1 border border-gray-800 rounded text-xs flex-1 sm:flex-none">
                       <option value="">Todos</option>
                       {eventosUnicos.map(e => <option key={e} value={e}>{e}</option>)}
                     </select>
-                    <input type="text" placeholder="Nombre o # boleto..." value={busqueda} onChange={e => { setBusqueda(e.target.value); setCheckinPage(0) }} className="px-2 py-1 border border-gray-200 rounded text-xs w-28 sm:w-36" />
+                    <input type="text" placeholder="Nombre o # boleto..." value={busqueda} onChange={e => { setBusqueda(e.target.value); setCheckinPage(0) }} className="px-2 py-1 border border-gray-800 rounded text-xs w-28 sm:w-36" />
                   </div>
                 </div>
                 <div className="max-h-[400px] overflow-y-auto overflow-x-auto">
@@ -549,7 +549,7 @@ export default function OpsPage() {
                           <td className="hidden sm:table-cell truncate max-w-[100px]">{c.event_name}</td>
                           <td>{formatTime(c.scanned_at)}</td>
                           <td>
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-bold text-white ${c.status === 'success' || c.status === 'valid' ? 'bg-green-500' : 'bg-red-500'}`}>
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-bold text-white ${c.status === 'success' || c.status === 'valid' ? 'bg-green-500/100' : 'bg-red-500/100'}`}>
                               {c.status === 'success' || c.status === 'valid' ? '✓ OK' : '✗ Fallo'}
                             </span>
                           </td>
@@ -561,20 +561,20 @@ export default function OpsPage() {
                 </div>
                 {/* Pagination */}
                 {historialFiltrado.length > PAGE_SIZE && (
-                  <div className="px-3 py-2 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+                  <div className="px-3 py-2 border-t border-gray-800 flex items-center justify-between text-xs text-gray-500">
                     <span>{showFrom}-{showTo} de {historialFiltrado.length}</span>
                     <div className="flex gap-1">
                       <button
                         onClick={() => setCheckinPage(p => Math.max(0, p - 1))}
                         disabled={checkinPage === 0}
-                        className="px-2 py-1 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="px-2 py-1 border border-gray-800 rounded hover:bg-[#0d0d0d] disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         ← Ant
                       </button>
                       <button
                         onClick={() => setCheckinPage(p => Math.min(totalPages - 1, p + 1))}
                         disabled={checkinPage >= totalPages - 1}
-                        className="px-2 py-1 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="px-2 py-1 border border-gray-800 rounded hover:bg-[#0d0d0d] disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         Sig →
                       </button>
@@ -584,7 +584,7 @@ export default function OpsPage() {
               </div>
 
               {/* Scanner Links — inline below check-in history */}
-              <div className="mt-4 pt-3 border-t border-gray-200">
+              <div className="mt-4 pt-3 border-t border-gray-800">
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="text-sm font-extrabold text-[#1E293B]">Scanner Links ({scannerLinks.length})</h3>
                   <button onClick={() => setShowCreateScanner(!showCreateScanner)} className="px-3 py-1 text-white rounded text-xs font-bold hover:opacity-90 bg-[#EF4444]">+ Crear</button>
@@ -592,11 +592,11 @@ export default function OpsPage() {
                 {showCreateScanner && (
                   <div className="section-card p-2 mb-2">
                     <div className="flex gap-2 flex-wrap">
-                      <select value={scannerForm.event_id} onChange={e => setScannerForm({...scannerForm, event_id: e.target.value})} className="flex-1 min-w-[120px] px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#EF4444]">
+                      <select value={scannerForm.event_id} onChange={e => setScannerForm({...scannerForm, event_id: e.target.value})} className="flex-1 min-w-[120px] px-2 py-1.5 border border-gray-800 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#EF4444]">
                         <option value="">Evento...</option>
                         {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
                       </select>
-                      <input type="text" value={scannerForm.label} onChange={e => setScannerForm({...scannerForm, label: e.target.value})} placeholder="Etiqueta (Puerta 1)" className="flex-1 min-w-[120px] px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#EF4444]" />
+                      <input type="text" value={scannerForm.label} onChange={e => setScannerForm({...scannerForm, label: e.target.value})} placeholder="Etiqueta (Puerta 1)" className="flex-1 min-w-[120px] px-2 py-1.5 border border-gray-800 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#EF4444]" />
                       <button onClick={async () => {
                         if (!scannerForm.event_id || !scannerForm.label) { toast.error('Completa evento y etiqueta'); return }
                         setScannerSubmitting(true)
@@ -651,19 +651,19 @@ export default function OpsPage() {
                 const pendingCount = withData.filter(pg => (pg.guests?.[0]?._status || 'pending') === 'pending').length;
                 const resolvedCount = withData.filter(pg => pg.guests?.[0]?._status === 'resolved').length;
                 return (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="bg-red-500/10 border border-red-200 rounded-lg p-3">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                     <h3 className="text-sm font-extrabold text-red-700">⚠️ Clientes Pendientes ({pendingCount} pendientes · {resolvedCount} resueltos)</h3>
                     <div className="flex gap-1">
                       {(['all', 'pending', 'resolved'] as const).map(f => (
-                        <button key={f} onClick={() => setPendingStatusFilter(f)} className={`px-2 py-0.5 rounded text-[10px] font-bold ${pendingFilter === f ? 'bg-red-600 text-white' : 'bg-white text-red-600 border border-red-200'}`}>
+                        <button key={f} onClick={() => setPendingStatusFilter(f)} className={`px-2 py-0.5 rounded text-[10px] font-bold ${pendingFilter === f ? 'bg-red-600 text-white' : 'bg-[#111] text-red-400 border border-red-200'}`}>
                           {f === 'all' ? 'Todos' : f === 'pending' ? 'Pendientes' : 'Resueltos'}
                         </button>
                       ))}
                     </div>
                   </div>
                   {ghostCount > 0 && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded px-2 py-1.5 mb-2">
+                    <div className="bg-yellow-500/10 border border-yellow-200 rounded px-2 py-1.5 mb-2">
                       <p className="text-[10px] text-yellow-700 font-bold">⚠️ {ghostCount} registros sin datos — solo Payment ID</p>
                     </div>
                   )}
@@ -675,7 +675,7 @@ export default function OpsPage() {
                         const status = guest._status || 'pending';
                         const isEditing = editingPendingId === pg.id;
                         return (
-                        <div key={pg.id || i} className={`rounded-lg p-2.5 border ${status === 'resolved' ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
+                        <div key={pg.id || i} className={`rounded-lg p-2.5 border ${status === 'resolved' ? 'bg-green-500/10 border-green-200' : 'bg-[#111] border-gray-800'}`}>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -688,7 +688,7 @@ export default function OpsPage() {
                               <p className="text-[10px] text-gray-500">{guest.email || '—'} · {guest.phone || '—'}</p>
                               {pg.payment_intent_id && <a href={`https://dashboard.stripe.com/payments/${pg.payment_intent_id}`} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono text-blue-500 hover:underline">{pg.payment_intent_id.slice(0, 20)}…</a>}
                               {guest._notes && <p className="text-[10px] text-gray-500 mt-1 italic">📝 {guest._notes}</p>}
-                              {guest._resolved_at && <p className="text-[9px] text-green-600">Resuelto: {new Date(guest._resolved_at).toLocaleString('es-MX')}</p>}
+                              {guest._resolved_at && <p className="text-[9px] text-green-400">Resuelto: {new Date(guest._resolved_at).toLocaleString('es-MX')}</p>}
                             </div>
                             <div className="flex gap-1 flex-shrink-0">
                               {status !== 'resolved' && (
@@ -698,28 +698,28 @@ export default function OpsPage() {
                                   // Reload
                                   const updated = await fetchPendingGuests();
                                   setPendingGuests(updated);
-                                }} className="px-2 py-1 bg-green-500 text-white rounded text-[10px] font-bold hover:bg-green-600">✓ Resolver</button>
+                                }} className="px-2 py-1 bg-green-500/100 text-white rounded text-[10px] font-bold hover:bg-green-600">✓ Resolver</button>
                               )}
                               {status === 'resolved' && (
                                 <button onClick={async () => {
                                   await updatePendingGuestStatus(pg.id, 'pending');
                                   const updated = await fetchPendingGuests();
                                   setPendingGuests(updated);
-                                }} className="px-2 py-1 bg-gray-200 text-gray-600 rounded text-[10px] font-bold hover:bg-gray-300">↩ Reabrir</button>
+                                }} className="px-2 py-1 bg-gray-700 text-gray-400 rounded text-[10px] font-bold hover:bg-gray-600">↩ Reabrir</button>
                               )}
-                              <button onClick={() => setEditingPendingId(isEditing ? null : pg.id)} className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-[10px] font-bold hover:bg-gray-200">✏️</button>
+                              <button onClick={() => setEditingPendingId(isEditing ? null : pg.id)} className="px-2 py-1 bg-gray-800 text-gray-400 rounded text-[10px] font-bold hover:bg-gray-700">✏️</button>
                             </div>
                           </div>
                           {isEditing && (
                             <div className="mt-2 flex gap-2">
-                              <input type="text" placeholder="Notas..." value={pendingNotes[pg.id] || ''} onChange={e => setPendingNotes(n => ({...n, [pg.id]: e.target.value}))} className="flex-1 px-2 py-1 border border-gray-200 rounded text-[10px]" />
+                              <input type="text" placeholder="Notas..." value={pendingNotes[pg.id] || ''} onChange={e => setPendingNotes(n => ({...n, [pg.id]: e.target.value}))} className="flex-1 px-2 py-1 border border-gray-800 rounded text-[10px]" />
                               <button onClick={async () => {
                                 await updatePendingGuestStatus(pg.id, status, pendingNotes[pg.id] || '');
                                 toast.success('Nota guardada');
                                 setEditingPendingId(null);
                                 const updated = await fetchPendingGuests();
                                 setPendingGuests(updated);
-                              }} className="px-2 py-1 bg-blue-500 text-white rounded text-[10px] font-bold">Guardar</button>
+                              }} className="px-2 py-1 bg-blue-500/100 text-white rounded text-[10px] font-bold">Guardar</button>
                             </div>
                           )}
                         </div>
@@ -741,7 +741,7 @@ export default function OpsPage() {
                   onChange={e => setCustomerSearch(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleCustomerSearch(1)}
                   placeholder="Buscar por nombre, email o teléfono..."
-                  className="flex-1 px-3 py-1.5 border border-gray-200 rounded text-xs sm:text-sm focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
+                  className="flex-1 px-3 py-1.5 border border-gray-800 rounded text-xs sm:text-sm focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
                 />
                 <button
                   onClick={() => handleCustomerSearch(1)}
@@ -754,14 +754,14 @@ export default function OpsPage() {
               {searchResults.length > 0 && (
                 <div className="space-y-2 max-h-[400px] overflow-y-auto">
                   {searchResults.map(customer => (
-                    <div key={customer.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div key={customer.id} className="border border-gray-800 rounded-lg overflow-hidden">
                       <div
                         onClick={() => handleExpandCustomer(customer.id)}
-                        className="p-2 sm:p-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                        className="p-2 sm:p-3 cursor-pointer hover:bg-[#0d0d0d] transition-colors"
                       >
                         <div className="flex justify-between items-center">
                           <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gray-100 flex items-center justify-center text-xs sm:text-sm font-bold text-gray-500">
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gray-800 flex items-center justify-center text-xs sm:text-sm font-bold text-gray-500">
                               {customer.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
@@ -769,7 +769,7 @@ export default function OpsPage() {
                               <p className="text-[10px] sm:text-xs text-gray-500">{customer.email}</p>
                               {customer.phone && <p className="text-[10px] text-gray-400">{customer.phone}</p>}
                               <div className="flex gap-2 mt-1 text-[10px]">
-                                <span className="text-green-600 font-bold">
+                                <span className="text-green-400 font-bold">
                                   {fmtCurrency(customer.total_spent || 0)}
                                 </span>
                                 <span className="text-blue-600">
@@ -784,7 +784,7 @@ export default function OpsPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2 sm:gap-3">
-                            <span className="text-[10px] sm:text-xs text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full font-bold">
+                            <span className="text-[10px] sm:text-xs text-gray-400 bg-gray-800 px-1.5 sm:px-2 py-0.5 rounded-full font-bold">
                               {customer.total_orders} boleto{customer.total_orders !== 1 ? 's' : ''}
                             </span>
                             <svg className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${expandedCustomer === customer.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -795,8 +795,8 @@ export default function OpsPage() {
                         className="overflow-hidden transition-all duration-300 ease-in-out"
                         style={{ maxHeight: expandedCustomer === customer.id ? '500px' : '0px', opacity: expandedCustomer === customer.id ? 1 : 0 }}
                       >
-                        <div className="border-t border-gray-100 bg-gray-50 p-3">
-                          <p className="text-xs font-bold text-gray-600 mb-2">Historial de compras</p>
+                        <div className="border-t border-gray-800 bg-[#0d0d0d] p-3">
+                          <p className="text-xs font-bold text-gray-400 mb-2">Historial de compras</p>
                           {historyLoading ? (
                             <div className="flex items-center justify-center py-4">
                               <div className="w-5 h-5 border-2 border-[#EF4444] border-t-transparent rounded-full animate-spin" />
@@ -827,7 +827,7 @@ export default function OpsPage() {
                                       <td className="text-right font-bold">{fmtCurrency(h.total_price || 0)}</td>
                                       <td>
                                         <div className="flex items-center gap-1">
-                                          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${h.payment_status === 'completed' ? 'bg-green-500' : h.payment_status === 'refunded' ? 'bg-red-500' : 'bg-yellow-500'}`}>
+                                          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${h.payment_status === 'completed' ? 'bg-green-500/100' : h.payment_status === 'refunded' ? 'bg-red-500/100' : 'bg-yellow-500/100'}`}>
                                             {h.payment_status === 'completed' ? 'Pagado' : h.payment_status === 'refunded' ? 'Reemb.' : h.payment_status}
                                           </span>
                                           {/* ticket_used column dropped */}
@@ -858,14 +858,14 @@ export default function OpsPage() {
                     <button
                       onClick={() => handleCustomerSearch(customerPage - 1)}
                       disabled={customerPage <= 1}
-                      className="px-3 py-1.5 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 font-bold"
+                      className="px-3 py-1.5 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-[#0d0d0d] font-bold"
                     >
                       Anterior
                     </button>
                     <button
                       onClick={() => handleCustomerSearch(customerPage + 1)}
                       disabled={customerPage * customerPageSize >= customerTotal}
-                      className="px-3 py-1.5 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 font-bold"
+                      className="px-3 py-1.5 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-[#0d0d0d] font-bold"
                     >
                       Siguiente
                     </button>
@@ -879,7 +879,7 @@ export default function OpsPage() {
 
               {/* Recovery — inline below CRM */}
               {ticketRecovery.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-gray-200">
+                <div className="mt-4 pt-3 border-t border-gray-800">
                   <h3 className="text-sm font-extrabold text-[#1E293B] mb-2">Recuperación de Boletos ({ticketRecovery.length})</h3>
                   <div className="overflow-x-auto">
                     <table className="data-table text-xs">
@@ -941,7 +941,7 @@ export default function OpsPage() {
                     <tr key={c.id}>
                       <td className="font-mono font-bold">{c.code}</td>
                       <td>
-                        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-gray-100 text-gray-700">
+                        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-gray-800 text-gray-300">
                           {hasPercent ? 'Porcentaje' : discType === 'bogo' ? 'BOGO' : 'Monto fijo'}
                         </span>
                       </td>
@@ -949,7 +949,7 @@ export default function OpsPage() {
                       <td className="text-right">{usedCount}</td>
                       <td className="text-right">{c.max_uses || '∞'}</td>
                       <td>
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-bold text-white ${c.is_active ? 'bg-green-500' : 'bg-gray-400'}`}>
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-bold text-white ${c.is_active ? 'bg-green-500/100' : 'bg-gray-400'}`}>
                           {c.is_active ? 'Activo' : 'Inactivo'}
                         </span>
                       </td>
@@ -964,7 +964,7 @@ export default function OpsPage() {
               </div>
 
               {/* Escalaciones — inline below cupones */}
-              <div className="mt-4 pt-3 border-t border-gray-200">
+              <div className="mt-4 pt-3 border-t border-gray-800">
                 <h3 className="text-sm font-extrabold text-[#1E293B] mb-2">Escalaciones ({escalations.length})</h3>
                 {escalations.length > 0 ? (
                   <div className="overflow-x-auto">
@@ -998,12 +998,12 @@ export default function OpsPage() {
 
       {/* Notification Log - outside tabs */}
       {hasNotifications && (
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
+        <div className="bg-[#111] rounded-lg  overflow-hidden">
+          <div className="px-3 py-2 border-b border-gray-800 flex items-center justify-between">
             <h3 className="text-sm font-extrabold">Log de Notificaciones</h3>
             <button
               onClick={() => setNotifFilter(!notifFilter)}
-              className={`px-2 py-1 rounded text-xs font-bold transition-colors ${notifFilter ? 'bg-[#EF4444] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              className={`px-2 py-1 rounded text-xs font-bold transition-colors ${notifFilter ? 'bg-[#EF4444] text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
             >
               {notifFilter ? 'Mostrar todo' : 'Filtros'}
             </button>
@@ -1014,14 +1014,14 @@ export default function OpsPage() {
                 <div key={log.id} className="px-3 py-2">
                   <div className="flex justify-between items-start">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-gray-900">{log.action}</p>
+                      <p className="text-xs font-bold text-white">{log.action}</p>
                       <p className="text-xs text-gray-500 mt-0.5 truncate">{log.user_email}</p>
                       <p className="text-xs text-gray-400">{formatTime(log.created_at)}</p>
                     </div>
-                    <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1"></span>
+                    <span className="w-2 h-2 rounded-full bg-blue-500/100 flex-shrink-0 mt-1"></span>
                   </div>
                   {log.details && (
-                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">{log.details}</p>
+                    <p className="text-xs text-gray-400 mt-1 line-clamp-2">{log.details}</p>
                   )}
                 </div>
               ))}
@@ -1038,76 +1038,76 @@ export default function OpsPage() {
       {/* Coupon Create Modal */}
       {showCouponModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowCouponModal(false)}>
-          <div className="bg-white rounded-2xl p-4 sm:p-6 max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base sm:text-lg font-extrabold text-gray-900 mb-4">Crear Cupón</h3>
+          <div className="bg-[#111] rounded-2xl p-4 sm:p-6 max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base sm:text-lg font-extrabold text-white mb-4">Crear Cupón</h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Código del cupón</label>
+                <label className="block text-xs font-bold text-gray-400 mb-1">Código del cupón</label>
                 <input
                   type="text"
                   value={couponForm.code}
                   onChange={e => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })}
                   placeholder="VERANO2026"
-                  className={"w-full px-3 py-2 border rounded-lg text-sm uppercase focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444] " + (couponErrors.code ? 'border-red-400' : 'border-gray-200')}
+                  className={"w-full px-3 py-2 border rounded-lg text-sm uppercase focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444] " + (couponErrors.code ? 'border-red-400' : 'border-gray-800')}
                 />
                 {couponErrors.code && <p className="text-xs text-red-500 mt-1">{couponErrors.code}</p>}
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Tipo de descuento</label>
+                <label className="block text-xs font-bold text-gray-400 mb-1">Tipo de descuento</label>
                 <select
                   value={couponForm.type}
                   onChange={e => setCouponForm({ ...couponForm, type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
+                  className="w-full px-3 py-2 border border-gray-800 rounded-lg text-sm focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
                 >
                   <option value="percentage">Porcentaje</option>
                   <option value="fixed">Monto fijo</option>
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">{couponForm.type === 'percentage' ? 'Porcentaje (%)' : 'Monto ($)'}</label>
+                <label className="block text-xs font-bold text-gray-400 mb-1">{couponForm.type === 'percentage' ? 'Porcentaje (%)' : 'Monto ($)'}</label>
                 <input
                   type="number"
                   value={couponForm.type === 'percentage' ? couponForm.discount_percent : couponForm.discount_amount}
                   onChange={e => setCouponForm({ ...couponForm, [couponForm.type === 'percentage' ? 'discount_percent' : 'discount_amount']: e.target.value })}
                   placeholder={couponForm.type === 'percentage' ? '15' : '100'}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
+                  className="w-full px-3 py-2 border border-gray-800 rounded-lg text-sm focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Evento asociado</label>
+                <label className="block text-xs font-bold text-gray-400 mb-1">Evento asociado</label>
                 <select
                   value={couponForm.event_id}
                   onChange={e => setCouponForm({ ...couponForm, event_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
+                  className="w-full px-3 py-2 border border-gray-800 rounded-lg text-sm focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
                 >
                   <option value="">Todos los eventos</option>
                   {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Límite de uso</label>
+                <label className="block text-xs font-bold text-gray-400 mb-1">Límite de uso</label>
                 <input
                   type="number"
                   value={couponForm.max_uses}
                   onChange={e => setCouponForm({ ...couponForm, max_uses: e.target.value })}
                   placeholder="100"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
+                  className="w-full px-3 py-2 border border-gray-800 rounded-lg text-sm focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Fecha de expiración</label>
+                <label className="block text-xs font-bold text-gray-400 mb-1">Fecha de expiración</label>
                 <input
                   type="date"
                   value={couponForm.valid_until}
                   onChange={e => setCouponForm({ ...couponForm, valid_until: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
+                  className="w-full px-3 py-2 border border-gray-800 rounded-lg text-sm focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]"
                 />
               </div>
             </div>
             <div className="flex gap-2 justify-end mt-6">
               <button
                 onClick={() => setShowCouponModal(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm font-bold hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 text-gray-400 rounded-lg text-sm font-bold hover:bg-[#0d0d0d]"
               >
                 Cancelar
               </button>
@@ -1128,12 +1128,12 @@ export default function OpsPage() {
       {/* Customer Detail Modal - Enhanced */}
       {selectedCustomer && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedCustomer(null)}>
-          <div className="bg-white rounded-xl p-4 sm:p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-[#111] rounded-xl p-4 sm:p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-base sm:text-lg font-extrabold text-[#1E293B]">Perfil del Cliente</h3>
               <button
                 onClick={() => setSelectedCustomer(null)}
-                className="text-gray-500 hover:text-gray-700 text-xl"
+                className="text-gray-500 hover:text-gray-300 text-xl"
               >
                 ×
               </button>
@@ -1141,7 +1141,7 @@ export default function OpsPage() {
 
             <div className="space-y-4">
               {/* Customer Info Card */}
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-[#0d0d0d] rounded-lg">
                 <div className="flex items-start gap-4">
                   <div className="w-16 h-16 rounded-full bg-[#EF4444]/10 flex items-center justify-center">
                     <span className="text-2xl font-bold text-[#EF4444]">
@@ -1149,28 +1149,28 @@ export default function OpsPage() {
                     </span>
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-extrabold text-lg text-gray-900">
+                    <h4 className="font-extrabold text-lg text-white">
                       {selectedCustomer.name} {selectedCustomer.last_name || ''}
                     </h4>
-                    <p className="text-sm text-gray-600 mt-0.5">{selectedCustomer.email}</p>
+                    <p className="text-sm text-gray-400 mt-0.5">{selectedCustomer.email}</p>
                     {selectedCustomer.phone && (
-                      <p className="text-sm text-gray-600">{selectedCustomer.phone}</p>
+                      <p className="text-sm text-gray-400">{selectedCustomer.phone}</p>
                     )}
 
                     {/* Stats Grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                      <div className="text-center p-2 bg-white rounded">
+                      <div className="text-center p-2 bg-[#111] rounded">
                         <p className="text-lg font-bold text-[#EF4444]">
                           {fmtCurrency(selectedCustomer.total_spent || 0)}
                         </p>
                         <p className="text-xs text-gray-500">Total Gastado</p>
                       </div>
-                      <div className="text-center p-2 bg-white rounded">
+                      <div className="text-center p-2 bg-[#111] rounded">
                         <p className="text-lg font-bold text-blue-600">{selectedCustomer.total_orders || 0}</p>
                         <p className="text-xs text-gray-500">Órdenes</p>
                       </div>
-                      <div className="text-center p-2 bg-white rounded">
-                        <p className="text-xs font-bold text-gray-700">
+                      <div className="text-center p-2 bg-[#111] rounded">
+                        <p className="text-xs font-bold text-gray-300">
                           {selectedCustomer.first_purchase_at
                             ? new Date(selectedCustomer.first_purchase_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })
                             : 'N/A'
@@ -1178,8 +1178,8 @@ export default function OpsPage() {
                         </p>
                         <p className="text-xs text-gray-500">Primera Compra</p>
                       </div>
-                      <div className="text-center p-2 bg-white rounded">
-                        <p className="text-xs font-bold text-gray-700">
+                      <div className="text-center p-2 bg-[#111] rounded">
+                        <p className="text-xs font-bold text-gray-300">
                           {selectedCustomer.last_purchase_at
                             ? new Date(selectedCustomer.last_purchase_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })
                             : 'N/A'
@@ -1194,40 +1194,40 @@ export default function OpsPage() {
 
               {/* Purchase History Table */}
               <div className="space-y-2">
-                <h4 className="font-extrabold text-sm text-gray-900 flex items-center gap-2">
+                <h4 className="font-extrabold text-sm text-white flex items-center gap-2">
                   <span>📋</span> Historial de Compras y Boletos
                 </h4>
 
                 {(selectedCustomer as any).tickets?.length > 0 ? (
-                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-[#111] border border-gray-800 rounded-lg overflow-hidden">
                     <div className="max-h-64 overflow-y-auto">
                       <table className="w-full text-xs">
-                        <thead className="bg-gray-50 sticky top-0">
+                        <thead className="bg-[#0d0d0d] sticky top-0">
                           <tr>
-                            <th className="text-left py-2 px-3 font-semibold text-gray-600">Boleto</th>
-                            <th className="text-left py-2 px-3 font-semibold text-gray-600">Zona</th>
-                            <th className="text-left py-2 px-3 font-semibold text-gray-600">Fecha</th>
-                            <th className="text-left py-2 px-3 font-semibold text-gray-600">Estado</th>
+                            <th className="text-left py-2 px-3 font-semibold text-gray-400">Boleto</th>
+                            <th className="text-left py-2 px-3 font-semibold text-gray-400">Zona</th>
+                            <th className="text-left py-2 px-3 font-semibold text-gray-400">Fecha</th>
+                            <th className="text-left py-2 px-3 font-semibold text-gray-400">Estado</th>
                           </tr>
                         </thead>
                         <tbody>
                           {(selectedCustomer as any).tickets.map((ticket: Ticket, index: number) => (
-                            <tr key={index} className="border-t border-gray-100 hover:bg-gray-50">
+                            <tr key={index} className="border-t border-gray-800 hover:bg-[#0d0d0d]">
                               <td className="py-2 px-3">
                                 <span className="font-mono text-[#EF4444] font-bold text-[11px]">
                                   {ticket.ticket_number}
                                 </span>
                               </td>
-                              <td className="py-2 px-3 text-gray-600">{ticket.zone_name}</td>
+                              <td className="py-2 px-3 text-gray-400">{ticket.zone_name}</td>
                               <td className="py-2 px-3 text-gray-500">
                                 {new Date(ticket.created_at).toLocaleDateString('es-MX')}
                               </td>
                               <td className="py-2 px-3">
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${
-                                  ticket.status === 'valid' ? 'bg-green-500' :
-                                  ticket.status === 'used' ? 'bg-blue-500' :
-                                  ticket.status === 'expired' ? 'bg-red-500' :
-                                  'bg-yellow-500'
+                                  ticket.status === 'valid' ? 'bg-green-500/100' :
+                                  ticket.status === 'used' ? 'bg-blue-500/100' :
+                                  ticket.status === 'expired' ? 'bg-red-500/100' :
+                                  'bg-yellow-500/100'
                                 }`}>
                                   {ticket.status === 'valid' ? 'Válido' :
                                    ticket.status === 'used' ? 'Usado' :
@@ -1241,14 +1241,14 @@ export default function OpsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg">
+                  <div className="text-center py-6 text-gray-500 bg-[#0d0d0d] rounded-lg">
                     <p>Este cliente no tiene historial de compras</p>
                   </div>
                 )}
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-2 justify-end pt-4 border-t border-gray-200">
+              <div className="flex gap-2 justify-end pt-4 border-t border-gray-800">
                 <button
                   onClick={() => toast.info('Próximamente: envío de email al cliente')}
                   className="px-4 py-2 bg-[#EF4444] text-white rounded-lg text-xs sm:text-sm font-bold hover:bg-red-600 transition-colors"
@@ -1257,7 +1257,7 @@ export default function OpsPage() {
                 </button>
                 <button
                   onClick={() => setSelectedCustomer(null)}
-                  className="px-4 py-2 text-gray-500 hover:text-gray-700 text-xs sm:text-sm font-bold"
+                  className="px-4 py-2 text-gray-500 hover:text-gray-300 text-xs sm:text-sm font-bold"
                 >
                   Cerrar
                 </button>

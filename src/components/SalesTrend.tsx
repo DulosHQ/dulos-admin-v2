@@ -32,7 +32,7 @@ function formatShortDate(dateString: string): string {
 export default function SalesTrend({ dailyData }: SalesTrendProps) {
   if (!dailyData || dailyData.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm p-6 text-center text-gray-500">
+      <div className="bg-[#111] rounded-xl shadow-sm p-6 text-center text-gray-500">
         No hay datos de ventas disponibles
       </div>
     );
@@ -73,8 +73,8 @@ export default function SalesTrend({ dailyData }: SalesTrendProps) {
   ].reverse();
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+    <div className="bg-[#111] rounded-xl shadow-sm p-6">
+      <h3 className="text-lg font-semibold text-white mb-4">
         Ventas Acumuladas - Últimos 7 días
       </h3>
 
@@ -107,7 +107,7 @@ export default function SalesTrend({ dailyData }: SalesTrendProps) {
                   y1={y}
                   x2={chartWidth - padding}
                   y2={y}
-                  stroke="#e5e7eb"
+                  stroke="#333"
                   strokeWidth="0.5"
                   strokeDasharray="2,2"
                 />
@@ -143,10 +143,10 @@ export default function SalesTrend({ dailyData }: SalesTrendProps) {
         </div>
       </div>
 
-      <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
+      <div className="mt-4 pt-4 border-t border-gray-800 flex justify-between items-center">
         <div>
           <p className="text-sm text-gray-500">Total acumulado</p>
-          <p className="text-2xl font-bold text-gray-900">
+          <p className="text-2xl font-bold text-white">
             {new Intl.NumberFormat('es-MX', {
               style: 'currency',
               currency: 'MXN',

@@ -21,11 +21,11 @@ function getDotColor(type: FeedItemType): string {
     case 'checkin':
       return 'bg-blue-500';
     case 'alert':
-      return 'bg-red-500';
+      return 'bg-red-500/100';
     case 'coupon':
       return 'bg-purple-500';
     default:
-      return 'bg-gray-500';
+      return 'bg-[#0d0d0d]0';
   }
 }
 
@@ -85,7 +85,7 @@ function FeedItemRow({ item }: { item: FeedItem }) {
             {getTypeLabel(item.type)}
           </span>
         </div>
-        <p className="text-sm text-gray-900">{item.message}</p>
+        <p className="text-sm text-white">{item.message}</p>
       </div>
 
       {/* Timestamp */}
@@ -103,8 +103,8 @@ export default function RecentFeed({ items }: RecentFeedProps) {
 
   if (!items || items.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="bg-[#111] rounded-xl shadow-sm border border-gray-800 p-6">
+        <h2 className="text-lg font-semibold text-white mb-4">
           Actividad Reciente
         </h2>
         <p className="text-gray-500 text-center py-8">
@@ -115,9 +115,9 @@ export default function RecentFeed({ items }: RecentFeedProps) {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div className="bg-[#111] rounded-xl shadow-sm border border-gray-800 p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">
+        <h2 className="text-lg font-semibold text-white">
           Actividad Reciente
         </h2>
         <button className="text-sm text-[#EF4444] hover:underline font-medium">

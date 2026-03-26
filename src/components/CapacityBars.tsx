@@ -79,18 +79,18 @@ function CapacityRow({
   return (
     <div>
       <div
-        className={`bg-white rounded-xl shadow-sm p-4 flex items-center gap-4 transition-colors ${
-          isExpandable ? 'cursor-pointer hover:bg-gray-50' : ''
+        className={`bg-[#111] rounded-xl shadow-sm p-4 flex items-center gap-4 transition-colors ${
+          isExpandable ? 'cursor-pointer hover:bg-[#0d0d0d]' : ''
         }`}
         onClick={onToggle}
       >
         <div className="w-full sm:w-48 flex-shrink-0">
-          <p className="font-medium text-gray-900 text-sm truncate">{schedule.name}</p>
+          <p className="font-medium text-white text-sm truncate">{schedule.name}</p>
           <p className="text-xs text-gray-500">{formatDate(schedule.date)}</p>
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="h-4 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-4 bg-gray-800 rounded-full overflow-hidden">
             <div
               className={`h-full ${barColor} rounded-full transition-all duration-300`}
               style={{ width: `${Math.min(schedule.percentage, 100)}%` }}
@@ -102,7 +102,7 @@ function CapacityRow({
         </div>
 
         <div className="flex items-center gap-3 flex-shrink-0">
-          <span className="text-lg font-bold text-gray-900 w-14 text-right">
+          <span className="text-lg font-bold text-white w-14 text-right">
             {schedule.percentage.toFixed(0)}%
           </span>
           <span
@@ -133,17 +133,17 @@ function CapacityRow({
           {zones?.map((zone) => {
             const config = getStatusConfig(zone.percentage);
             return (
-              <div key={zone.zone_name} className="bg-gray-50 rounded-lg p-3 flex items-center gap-3">
-                <span className="w-32 text-sm font-medium text-gray-700 truncate">{zone.zone_name}</span>
+              <div key={zone.zone_name} className="bg-[#0d0d0d] rounded-lg p-3 flex items-center gap-3">
+                <span className="w-32 text-sm font-medium text-gray-300 truncate">{zone.zone_name}</span>
                 <div className="flex-1">
-                  <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="h-2.5 bg-gray-700 rounded-full overflow-hidden">
                     <div
                       className={`h-full ${config.barColor} rounded-full transition-all duration-300`}
                       style={{ width: `${Math.min(zone.percentage, 100)}%` }}
                     />
                   </div>
                 </div>
-                <span className="text-sm text-gray-600 w-24 text-right">
+                <span className="text-sm text-gray-400 w-24 text-right">
                   {zone.sold.toLocaleString('es-MX')}/{zone.total.toLocaleString('es-MX')}
                 </span>
                 <span className="text-sm font-bold w-12 text-right">{zone.percentage.toFixed(0)}%</span>
@@ -159,7 +159,7 @@ function CapacityRow({
 export default function CapacityBars({ schedules, zonesByEvent, expandedIndex, onToggle }: CapacityBarsProps) {
   if (!schedules || schedules.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm p-6 text-center text-gray-500">
+      <div className="bg-[#111] rounded-xl shadow-sm p-6 text-center text-gray-500">
         No hay funciones programadas
       </div>
     );

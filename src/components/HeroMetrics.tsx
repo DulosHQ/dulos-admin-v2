@@ -79,15 +79,15 @@ function MetricCard({ metric }: { metric: MetricData }) {
   const isPositive = (metric.change ?? 0) > 0;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+    <div className="bg-[#111] rounded-lg border border-gray-800 p-4" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
       <div className="flex items-center gap-1.5 mb-2">
         <div className="w-6 h-6 flex items-center justify-center">{icon}</div>
         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{metric.label}</p>
       </div>
-      <p className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight leading-none">{metric.value}</p>
+      <p className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-none">{metric.value}</p>
       {hasChange && (
         <div className="mt-1.5">
-          <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-bold ${isPositive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+          <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-bold ${isPositive ? 'bg-green-50 text-green-700' : 'bg-red-500/10 text-red-400'}`}>
             {isPositive ? '+' : ''}{metric.change?.toFixed(1)}% vs período anterior
           </span>
         </div>

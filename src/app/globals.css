@@ -12,20 +12,19 @@ html, body {
 
 /* Metric Cards - Cellosa style, tight */
 .metric-card {
-  @apply bg-white rounded-lg border border-gray-200 p-2.5 relative;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  @apply bg-[#111] rounded-lg border border-gray-800 p-2.5 relative;
 }
 
 .metric-card-title {
-  @apply text-xs text-gray-500 font-medium;
+  @apply text-xs text-gray-400 font-medium;
 }
 
 .metric-card-value {
-  @apply text-xl font-bold text-gray-900 mt-0.5;
+  @apply text-xl font-bold text-white mt-0.5;
 }
 
 .metric-card-subtitle {
-  @apply text-[11px] text-gray-400 mt-0;
+  @apply text-[11px] text-gray-500 mt-0;
 }
 
 .metric-card-icon {
@@ -69,11 +68,11 @@ html, body {
 }
 
 .data-table tbody tr {
-  @apply border-b border-gray-100 hover:bg-gray-50 transition-colors;
+  @apply border-b border-gray-800 hover:bg-gray-800/50 transition-colors;
 }
 
 .data-table tbody td {
-  @apply px-3 py-2 text-gray-700;
+  @apply px-3 py-2 text-gray-300;
 }
 
 .data-table tbody tr:last-child {
@@ -91,16 +90,15 @@ html, body {
 
 /* Section Cards - tight spacing */
 .section-card {
-  @apply bg-white rounded-lg border border-gray-200 overflow-hidden;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  @apply bg-[#111] rounded-lg border border-gray-800 overflow-hidden;
 }
 
 .section-card-header {
-  @apply px-3 py-2.5 border-b border-gray-100 flex items-center gap-2 flex-wrap;
+  @apply px-3 py-2.5 border-b border-gray-800 flex items-center gap-2 flex-wrap;
 }
 
 .section-card-title {
-  @apply text-sm font-semibold text-gray-800 flex items-center gap-2;
+  @apply text-sm font-semibold text-white flex items-center gap-2;
 }
 
 .section-card-body {
@@ -123,45 +121,45 @@ html, body {
 }
 
 .badge-success {
-  @apply bg-emerald-50 text-emerald-600;
+  @apply bg-emerald-500/10 text-emerald-400;
 }
 
 .badge-warning {
-  @apply bg-amber-50 text-amber-600;
+  @apply bg-amber-500/10 text-amber-400;
 }
 
 .badge-error {
-  @apply bg-red-50 text-red-600;
+  @apply bg-red-500/10 text-red-400;
 }
 
 .badge-info {
-  @apply bg-blue-50 text-blue-600;
+  @apply bg-blue-500/10 text-blue-400;
 }
 
 /* Event type badges */
 .badge-single {
-  @apply bg-amber-100 text-amber-800;
+  @apply bg-amber-500/10 text-amber-400;
 }
 
 .badge-recurring {
-  @apply bg-indigo-100 text-indigo-800;
+  @apply bg-indigo-500/10 text-indigo-400;
 }
 
 .badge-multiday {
-  @apply bg-teal-100 text-teal-800;
+  @apply bg-teal-500/10 text-teal-400;
 }
 
 /* Zone type badges */
 .badge-ga {
-  @apply bg-green-100 text-green-800;
+  @apply bg-green-500/10 text-green-400;
 }
 
 .badge-reserved {
-  @apply bg-orange-100 text-orange-800;
+  @apply bg-orange-500/10 text-orange-400;
 }
 
 .badge-hybrid {
-  @apply bg-purple-100 text-purple-800;
+  @apply bg-purple-500/10 text-purple-400;
 }
 
 /* Percentage highlights - CLK style */
