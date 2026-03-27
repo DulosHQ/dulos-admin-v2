@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 const CATEGORIES = ['teatro', 'concierto', 'festival', 'standup', 'comedia', 'musical', 'otro'];
 const ZONE_COLORS = ['#E63946', '#2A7AE8', '#E88D2A', '#10B981', '#8B5CF6', '#EC4899', '#F59E0B', '#06B6D4'];
 const DAYS_ES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-const STEP_LABELS = ['Info', 'Funciones', 'Zonas', 'Comisión', 'Revisión'];
+const STEP_LABELS = ['Info', 'Fechas', 'Zonas', 'Organizador', 'Revisión'];
 const fmt = (n: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(n);
 
 /* ─── Types ─── */
@@ -101,7 +101,10 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
     { zone_name: 'General', zone_type: 'ga', price: 0, original_price: 0, total_capacity: 100, color: ZONE_COLORS[0], has_2x1: false },
   ]);
 
-  // Step 4: Commission & Config
+  // Step 4: Organizer & Commission
+  const [orgName, setOrgName] = useState('');
+  const [orgPhone, setOrgPhone] = useState('5573933510');
+  const [orgEmail, setOrgEmail] = useState('paolo@dulos.io');
   const [commRate, setCommRate] = useState(15);
 
   // Selected venue
@@ -179,6 +182,7 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
     setZones([{ zone_name: 'General', zone_type: 'ga', price: 0, original_price: 0, total_capacity: 100, color: ZONE_COLORS[0], has_2x1: false }]);
     setSchedules([{ date: '', start_time: '20:00', end_time: '', total_capacity: 0, staff_pin: rPin(), staff_phone: '', staff_email: '' }]);
     setCommRate(15); setDurationMin(90); setShowRecHelper(false);
+    setOrgName(''); setOrgPhone('5573933510'); setOrgEmail('paolo@dulos.io');
   }, [open]);
 
   // ─── Generate recurring schedules ───
@@ -210,7 +214,7 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
     if (newSchedules.length > 0) {
       setSchedules(newSchedules);
       setShowRecHelper(false);
-      toast.success(`${newSchedules.length} funciones generadas`);
+      toast.success(`${newSchedules.length} fechas generadas`);
     } else {
       toast.error('No se encontraron fechas para el día seleccionado');
     }
@@ -275,8 +279,8 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
           end_time: s.end_time || null,
           total_capacity: s.total_capacity || totalZoneCapacity,
           staff_pin: s.staff_pin,
-          staff_phone: s.staff_phone || '5573933510',
-          staff_email: s.staff_email || 'paolo@dulos.io',
+          staff_phone: orgPhone || '5573933510',
+          staff_email: orgEmail || 'paolo@dulos.io',
         })),
         commission_rate: commRate / 100,
         venue_timezone: selVenue?.timezone || 'America/Mexico_City',
@@ -291,7 +295,7 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al crear evento');
 
-      toast.success(`✅ Evento creado: ${data.summary.zones} zonas, ${data.summary.schedules} funciones, ${data.summary.inventory_rows} inventario`);
+      toast.success(`✅ Evento creado: ${data.summary.zones} zonas, ${data.summary.schedules} fechas, ${data.summary.inventory_rows} inventario`);
       onCreated();
       onClose();
     } catch (e: any) {
@@ -381,8 +385,8 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
 
               <div>
                 <label className={lblCls}>Slug (auto)</label>
-                <input className={inpCls} value={ev.slug} onChange={e => { setSlugEdited(true); setEv(p => ({ ...p, slug: e.target.value })); }}/>
-                <p className="text-[10px] text-gray-600 mt-1">Auto: nombre-venue-ciudad. Editable.</p>
+                <input className={`${inpCls} opacity-60 cursor-not-allowed`} value={ev.slug} readOnly tabIndex={-1}/>
+                <p className="text-[10px] text-gray-600 mt-1">Auto-generado: nombre-venue-ciudad</p>
               </div>
 
               <div>
@@ -408,7 +412,7 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
               <details className="group">
                 <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-300 transition-colors">SEO (auto-generado) ▸</summary>
                 <div className="mt-3 space-y-3">
-                  <div><label className={lblCls}>SEO Title</label><input className={inpCls} value={ev.seo_title} onChange={e => { setSeoTitleEdited(true); setEv(p => ({ ...p, seo_title: e.target.value })); }}/></div>
+                  <div><label className={lblCls}>SEO Title (auto)</label><input className={`${inpCls} opacity-60 cursor-not-allowed`} value={ev.seo_title} readOnly tabIndex={-1}/></div>
                   <div><label className={lblCls}>SEO Description</label><textarea className={`${inpCls} min-h-[50px] resize-y`} value={ev.seo_description} onChange={e => { setSeoDescEdited(true); setEv(p => ({ ...p, seo_description: e.target.value })); }}/></div>
                 </div>
               </details>
@@ -424,14 +428,14 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
                   <input type="number" className={`${inpCls} w-20`} value={durationMin} onChange={e => setDurationMin(Number(e.target.value))} min={15} step={15}/>
                 </div>
                 <button onClick={() => setShowRecHelper(!showRecHelper)} className="text-xs text-[#EF4444] hover:text-red-300 transition-colors">
-                  {showRecHelper ? 'Cerrar' : '🔄 Generar recurrentes'}
+                  {showRecHelper ? 'Cerrar' : '🔄 Generar fechas recurrentes'}
                 </button>
               </div>
 
               {/* Recurring helper */}
               {showRecHelper && (
                 <div className={`${cardCls} space-y-3`}>
-                  <p className="text-xs font-medium text-white">Generar funciones recurrentes</p>
+                  <p className="text-xs font-medium text-white">Generar fechas recurrentes</p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
                       <label className={lblCls}>Día</label>
@@ -454,23 +458,18 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
                 <div key={i} className={`${cardCls} relative`}>
                   {schedules.length > 1 && <XBtn onClick={() => setSchedules(ss => ss.filter((_, j) => j !== i))}/>}
                   <p className="text-xs text-gray-500 font-medium mb-3">
-                    Función {i + 1}
+                    Fecha {i + 1}
                     {s.date && <span className="text-gray-600 ml-2">· {DAYS_ES[new Date(s.date + 'T12:00').getDay()]}</span>}
                     <span className="text-gray-600 ml-2">· PIN: {s.staff_pin}</span>
                   </p>
-                  <div className="grid grid-cols-3 gap-3 mb-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <div><label className={lblCls}>Fecha *</label><input type="date" className={inpCls} value={s.date} onChange={e => setSchedules(ss => ss.map((x, j) => j === i ? { ...x, date: e.target.value } : x))}/></div>
                     <div><label className={lblCls}>Hora inicio *</label><input type="time" className={inpCls} value={s.start_time} onChange={e => { const v = e.target.value; setSchedules(ss => ss.map((x, j) => { if (j !== i) return x; const [h, m] = v.split(':').map(Number); const total = h * 60 + m + durationMin; const eh = Math.floor(total / 60) % 24; const em = total % 60; return { ...x, start_time: v, end_time: `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}` }; })); }}/></div>
                     <div><label className={lblCls}>Hora fin</label><input type="time" className={inpCls} value={s.end_time} onChange={e => setSchedules(ss => ss.map((x, j) => j === i ? { ...x, end_time: e.target.value } : x))}/></div>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div><label className={lblCls}>Capacidad</label><input type="number" className={inpCls} value={s.total_capacity || ''} placeholder="auto" onChange={e => setSchedules(ss => ss.map((x, j) => j === i ? { ...x, total_capacity: Number(e.target.value) } : x))}/></div>
-                    <div><label className={lblCls}>Tel. staff</label><input className={inpCls} value={s.staff_phone} placeholder="auto" onChange={e => setSchedules(ss => ss.map((x, j) => j === i ? { ...x, staff_phone: e.target.value } : x))}/></div>
-                    <div><label className={lblCls}>Email staff</label><input type="email" className={inpCls} value={s.staff_email} placeholder="auto" onChange={e => setSchedules(ss => ss.map((x, j) => j === i ? { ...x, staff_email: e.target.value } : x))}/></div>
-                  </div>
                 </div>
               ))}
-              <button onClick={() => setSchedules(ss => [...ss, { date: '', start_time: '20:00', end_time: '', total_capacity: 0, staff_pin: rPin(), staff_phone: '', staff_email: '' }])} className="w-full py-2.5 rounded-lg border border-dashed border-gray-700 text-sm text-gray-400 hover:text-white hover:border-gray-500 transition-colors">+ Agregar función</button>
+              <button onClick={() => setSchedules(ss => [...ss, { date: '', start_time: '20:00', end_time: '', total_capacity: 0, staff_pin: rPin(), staff_phone: '', staff_email: '' }])} className="w-full py-2.5 rounded-lg border border-dashed border-gray-700 text-sm text-gray-400 hover:text-white hover:border-gray-500 transition-colors">+ Agregar fecha</button>
             </div>
           )}
 
@@ -514,10 +513,6 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
                       <label className={lblCls}>Color</label>
                       <div className="flex items-center gap-2">
                         <input type="color" className="w-8 h-8 rounded cursor-pointer bg-transparent border-0" value={z.color} onChange={e => setZones(zs => zs.map((x, j) => j === i ? { ...x, color: e.target.value } : x))}/>
-                        <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer">
-                          <input type="checkbox" className="accent-[#EF4444]" checked={z.has_2x1} onChange={e => setZones(zs => zs.map((x, j) => j === i ? { ...x, has_2x1: e.target.checked } : x))}/>
-                          2x1
-                        </label>
                       </div>
                     </div>
                   </div>
@@ -533,9 +528,20 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
             </div>
           )}
 
-          {/* ═══ STEP 4: COMMISSION & CONFIG ═══ */}
+          {/* ═══ STEP 4: ORGANIZADOR ═══ */}
           {step === 4 && (
             <div className="space-y-4">
+              <div className={cardCls}>
+                <p className="text-xs text-gray-500 font-medium mb-3">Contacto del organizador</p>
+                <div className="space-y-3">
+                  <div><label className={lblCls}>Nombre / Productora</label><input className={inpCls} value={orgName} onChange={e => setOrgName(e.target.value)} placeholder="Dulos Producciones"/></div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label className={lblCls}>Teléfono</label><input className={inpCls} value={orgPhone} onChange={e => setOrgPhone(e.target.value)} placeholder="55 7393 3510"/></div>
+                    <div><label className={lblCls}>Email</label><input type="email" className={inpCls} value={orgEmail} onChange={e => setOrgEmail(e.target.value)} placeholder="paolo@dulos.io"/></div>
+                  </div>
+                </div>
+              </div>
+
               <div className={cardCls}>
                 <p className="text-xs text-gray-500 font-medium mb-3">Comisión Dulos</p>
                 <div className="flex items-center gap-3">
@@ -580,7 +586,7 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
                 <p className="text-sm font-bold text-white">{ev.name}</p>
                 <div className="flex flex-wrap gap-3 mt-1 text-xs text-gray-400">
                   <span>/{ev.slug}</span>
-                  <span>{schedules.length === 1 ? 'Única función' : `Recurrente (${schedules.length} funciones)`}</span>
+                  <span>{schedules.length === 1 ? 'Única fecha' : `Recurrente (${schedules.length} fechas)`}</span>
                   <span>{ev.category}</span>
                   {ev.image_url && <span className="text-green-400">✓ Imagen</span>}
                 </div>
@@ -596,7 +602,6 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
                         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: z.color }}/>
                         <span className="text-white">{z.zone_name}</span>
                         <span className="text-gray-600">({z.zone_type})</span>
-                        {z.has_2x1 && <span className="text-yellow-400">2x1</span>}
                       </div>
                       <div className="text-gray-400">
                         {fmt(z.price)}
@@ -610,7 +615,7 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
 
               {/* Schedules */}
               <div className={cardCls}>
-                <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Funciones ({schedules.length})</p>
+                <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Fechas ({schedules.length})</p>
                 <div className="space-y-1">
                   {schedules.map((s, i) => (
                     <div key={i} className="flex items-center justify-between text-xs">
@@ -625,9 +630,9 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
               <div className={cardCls}>
                 <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Se creará</p>
                 <div className="space-y-1 text-xs text-gray-300">
-                  <p>✓ 1 evento ({schedules.length === 1 ? 'single' : 'recurring'})</p>
+                  <p>✓ 1 evento ({schedules.length === 1 ? 'única fecha' : 'recurrente'})</p>
                   <p>✓ {zones.length} zona{zones.length > 1 ? 's' : ''} de boletos</p>
-                  <p>✓ {schedules.length} función{schedules.length > 1 ? 'es' : ''}</p>
+                  <p>✓ {schedules.length} fecha{schedules.length > 1 ? 's' : ''}</p>
                   <p>✓ {schedules.length * zones.length} registros de inventario</p>
                   <p>✓ Comisión: {commRate}%</p>
                 </div>
