@@ -94,7 +94,7 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
 
   // Step 2: Schedules
   const [schedules, setSchedules] = useState<ScheduleForm[]>([
-    { date: '', start_time: '20:00', end_time: '', total_capacity: 0, staff_pin: rPin(), staff_phone: '', staff_email: '' },
+    { date: '', start_time: '20:00', end_time: '21:30', total_capacity: 0, staff_pin: rPin(), staff_phone: '', staff_email: '' },
   ]);
   const [durationMin, setDurationMin] = useState(90);
 
@@ -189,7 +189,7 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
     setSeoTitleEdited(false); setSeoDescEdited(false);
     setEv({ name: '', slug: '', venue_id: '', category: 'teatro', description: '', long_description: '', quote: '', image_url: '', poster_url: '', card_url: '', seo_title: '', seo_description: '', show_remaining: false, featured: false, sort_order: 0 });
     setZones([{ zone_name: 'General', zone_type: 'ga', price: 0, original_price: 0, total_capacity: 100, color: ZONE_COLORS[0], has_2x1: false, venue_section_ids: [] }]);
-    setSchedules([{ date: '', start_time: '20:00', end_time: '', total_capacity: 0, staff_pin: rPin(), staff_phone: '', staff_email: '' }]);
+    setSchedules([{ date: '', start_time: '20:00', end_time: '21:30', total_capacity: 0, staff_pin: rPin(), staff_phone: '', staff_email: '' }]);
     setCommRate(15); setDurationMin(90); setShowRecHelper(false);
     setOrgName(''); setOrgPhone('5573933510'); setOrgEmail('paolo@dulos.io');
   }, [open]);
@@ -475,11 +475,11 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
                   <div className="grid grid-cols-3 gap-3">
                     <div><label className={lblCls}>Fecha *</label><input type="date" className={inpCls} value={s.date} onChange={e => setSchedules(ss => ss.map((x, j) => j === i ? { ...x, date: e.target.value } : x))}/></div>
                     <div><label className={lblCls}>Hora inicio *</label><input type="time" className={inpCls} value={s.start_time} onChange={e => { const v = e.target.value; setSchedules(ss => ss.map((x, j) => { if (j !== i) return x; const [h, m] = v.split(':').map(Number); const total = h * 60 + m + durationMin; const eh = Math.floor(total / 60) % 24; const em = total % 60; return { ...x, start_time: v, end_time: `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}` }; })); }}/></div>
-                    <div><label className={lblCls}>Hora fin</label><input type="time" className={inpCls} value={s.end_time} onChange={e => setSchedules(ss => ss.map((x, j) => j === i ? { ...x, end_time: e.target.value } : x))}/></div>
+                    <div><label className={lblCls}>Hora fin</label><input type="time" className={`${inpCls} text-gray-400 cursor-default`} value={s.end_time} readOnly tabIndex={-1}/></div>
                   </div>
                 </div>
               ))}
-              <button onClick={() => setSchedules(ss => [...ss, { date: '', start_time: '20:00', end_time: '', total_capacity: 0, staff_pin: rPin(), staff_phone: '', staff_email: '' }])} className="w-full py-2.5 rounded-lg border border-dashed border-gray-700 text-sm text-gray-400 hover:text-white hover:border-gray-500 transition-colors">+ Agregar fecha</button>
+              <button onClick={() => { const dur = durationMin || 90; setSchedules(ss => [...ss, { date: '', start_time: '20:00', end_time: `${String(Math.floor((20 * 60 + dur) / 60) % 24).padStart(2, '0')}:${String((20 * 60 + dur) % 60).padStart(2, '0')}`, total_capacity: 0, staff_pin: rPin(), staff_phone: '', staff_email: '' }]); }} className="w-full py-2.5 rounded-lg border border-dashed border-gray-700 text-sm text-gray-400 hover:text-white hover:border-gray-500 transition-colors">+ Agregar fecha</button>
             </div>
           )}
 
