@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
   "/api/webhooks/stripe",
   "/api/health",
   "/api/meta-proxy",
+  "/api/test-coupons",
   "/dulos-logo.svg",
 ];
 
