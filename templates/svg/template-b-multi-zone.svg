@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 {{SVG_HEIGHT}}">
+  <!-- Background -->
+  <rect x="0" y="0" width="400" height="{{SVG_HEIGHT}}" fill="#0a0a0a" rx="10"/>
+
+  <!-- Venue name -->
+  <text x="200" y="24" text-anchor="middle" font-family="Inter,Helvetica Neue,Arial,sans-serif" font-weight="300" font-size="11" fill="#888888" letter-spacing="2">{{VENUE_NAME}}</text>
+
+  {{ZONE_BLOCKS}}
+
+  <!-- Decorative aisle -->
+  <rect x="155" y="{{AISLE_Y}}" width="90" height="20" rx="4" fill="#1a1a1a" stroke="#333" stroke-width="1"/>
+
+  <!-- Stage -->
+  <rect x="80" y="{{STAGE_Y}}" width="240" height="50" rx="6" fill="#1a1a1a" stroke="#333" stroke-width="1.5"/>
+  <text x="200" y="{{STAGE_TEXT_Y}}" text-anchor="middle" font-family="Inter,Helvetica Neue,Arial,sans-serif" font-weight="600" font-size="14" fill="#ffffff" letter-spacing="3">ESCENARIO</text>
+
+  <!-- Dulos branding -->
+  <text x="200" y="{{BRAND_Y}}" text-anchor="middle" font-family="Inter,Helvetica Neue,Arial,sans-serif" font-size="10" fill="#EF4444" font-weight="600" letter-spacing="1.5">DULOS</text>
+</svg>

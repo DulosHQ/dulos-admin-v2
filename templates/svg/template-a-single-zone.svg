@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 600" width="500" height="600">
+  <!-- Background -->
+  <rect width="500" height="600" rx="12" fill="#0a0a0a"/>
+
+  <!-- Venue name -->
+  <text x="250" y="36" text-anchor="middle" font-family="Inter,Helvetica Neue,Arial,sans-serif" font-weight="300" font-size="13" fill="#888888" letter-spacing="2">{{VENUE_NAME}}</text>
+
+  <!-- Zone: {{ZONE_1_NAME}} -->
+  <g data-zone="{{ZONE_1_NAME}}" data-zone-type="ga">
+    <path d="M 80,55 L 420,55 Q 445,55 445,80 L 432,380 Q 427,405 395,410 L 250,425 L 105,410 Q 73,405 68,380 L 55,80 Q 55,55 80,55 Z" fill="{{ZONE_1_COLOR}}" style="cursor:pointer;transition:all 0.2s"/>
+  </g>
+
+  <!-- Zone label (outside group) -->
+  <text x="250" y="225" text-anchor="middle" font-family="Inter,Helvetica Neue,Arial,sans-serif" font-weight="700" font-size="32" fill="#ffffff" style="pointer-events:none">{{ZONE_1_NAME}}</text>
+
+  <!-- Decorative divider -->
+  <line x1="100" y1="450" x2="400" y2="450" stroke="#333" stroke-width="1" stroke-dasharray="4,4"/>
+
+  <!-- Stage -->
+  <rect x="80" y="475" width="340" height="65" rx="8" fill="#1a1a1a" stroke="#333" stroke-width="1"/>
+  <text x="250" y="515" text-anchor="middle" font-family="Inter,Helvetica Neue,Arial,sans-serif" font-weight="600" font-size="15" fill="#ffffff" letter-spacing="3">ESCENARIO</text>
+
+  <!-- Dulos branding -->
+  <text x="250" y="575" text-anchor="middle" font-family="Inter,Helvetica Neue,Arial,sans-serif" font-size="11" fill="#EF4444" font-weight="600" letter-spacing="1.5">DULOS</text>
+  <text x="250" y="590" text-anchor="middle" font-family="Inter,Helvetica Neue,Arial,sans-serif" font-size="9" fill="#555" letter-spacing="1">TICKETING</text>
+</svg>
