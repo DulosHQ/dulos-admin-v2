@@ -80,7 +80,7 @@ interface EventInput {
   schedules: ScheduleInput[];
   commission_rate: number;
   venue_timezone: string;
-  seat_assignments?: Record<string, number>; // rowKey (section::row_label) → zone index
+  seat_assignments?: Record<string, number | { splits: { from: number; to: number; zoneIdx: number }[] }>; // rowKey → whole-row zone index OR splits
 }
 
 /* ─── Main ─── */
@@ -253,18 +253,30 @@ export async function POST(req: NextRequest) {
           created.push({ table: 'event_sections', filter: `id=eq.${es.id}` });
         }
 
-        // Fetch all venue_seats for the venue
-        const allVenueSeats = await supaFetch<{ id: string; section: string; row_label: string }[]>(
+        // Fetch all venue_seats for the venue (include seat_number for split range matching)
+        const allVenueSeats = await supaFetch<{ id: string; section: string; row_label: string; seat_number: number }[]>(
           'venue_seats',
-          `venue_id=eq.${input.venue_id}&select=id,section,row_label&order=sort_order.asc&limit=5000`
+          `venue_id=eq.${input.venue_id}&select=id,section,row_label,seat_number&order=sort_order.asc&limit=5000`
         );
 
         // For each seat, determine zone assignment and create event_section_seat
         const seatInserts: { event_section_id: string; venue_seat_id: string; zone_id: string; status: string }[] = [];
         for (const seat of allVenueSeats) {
           const rowKey = `${seat.section}::${seat.row_label}`;
-          const zoneIndex = input.seat_assignments[rowKey];
-          if (zoneIndex === undefined || zoneIndex < 0 || zoneIndex >= createdZones.length) continue;
+          const assignment = input.seat_assignments![rowKey];
+          if (assignment === undefined) continue;
+
+          let zoneIndex: number;
+          if (typeof assignment === 'number') {
+            zoneIndex = assignment;
+          } else {
+            // Split mode: find which range this seat falls into
+            const matchingSplit = assignment.splits.find(sp => seat.seat_number >= sp.from && seat.seat_number <= sp.to);
+            if (!matchingSplit) continue;
+            zoneIndex = matchingSplit.zoneIdx;
+          }
+
+          if (zoneIndex < 0 || zoneIndex >= createdZones.length) continue;
 
           const zoneId = createdZones[zoneIndex].id;
           const venueSectionId = sectionSlugToId.get(seat.section);
@@ -364,12 +376,12 @@ export async function POST(req: NextRequest) {
           created.push({ table: 'event_sections', filter: `id=eq.${es.id}` });
         }
 
-        // Fetch all venue_seats for this venue
+        // Fetch all venue_seats for this venue (include seat_number for split range matching)
         const seatsRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/venue_seats?venue_id=eq.${input.venue_id}&order=sort_order.asc&limit=5000`,
+          `${SUPABASE_URL}/rest/v1/venue_seats?venue_id=eq.${input.venue_id}&select=id,section,row_label,seat_number&order=sort_order.asc&limit=5000`,
           { headers: { ...headers, 'Prefer': '' } }
         );
-        const venueSeats: { id: string; section: string; row_label: string }[] = seatsRes.ok ? await seatsRes.json() : [];
+        const venueSeats: { id: string; section: string; row_label: string; seat_number?: number }[] = seatsRes.ok ? await seatsRes.json() : [];
 
         // Build event_section_seats batch
         const essBatch: { event_section_id: string; venue_seat_id: string; zone_id: string | null; status: string }[] = [];
@@ -381,10 +393,19 @@ export async function POST(req: NextRequest) {
           const eventSectionId = eventSectionMap.get(venueSectionId);
           if (!eventSectionId) continue;
 
-          // Get zone assignment from seat_assignments (rowKey = section::row_label → zone index)
+          // Get zone assignment from seat_assignments (rowKey = section::row_label → zone index or splits)
           const rowKey = `${seat.section}::${seat.row_label}`;
-          const zoneIdx = input.seat_assignments[rowKey];
-          const zoneId = zoneIdx !== undefined && createdZones[zoneIdx] ? createdZones[zoneIdx].id : null;
+          const assignment = input.seat_assignments![rowKey];
+          let zoneId: string | null = null;
+          if (typeof assignment === 'number') {
+            zoneId = createdZones[assignment]?.id ?? null;
+          } else if (assignment && typeof assignment === 'object' && 'splits' in assignment) {
+            const seatNum = (seat as { id: string; section: string; row_label: string; seat_number?: number }).seat_number;
+            if (seatNum !== undefined) {
+              const matchingSplit = assignment.splits.find(sp => seatNum >= sp.from && seatNum <= sp.to);
+              zoneId = matchingSplit ? (createdZones[matchingSplit.zoneIdx]?.id ?? null) : null;
+            }
+          }
 
           essBatch.push({
             event_section_id: eventSectionId,

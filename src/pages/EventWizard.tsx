@@ -28,7 +28,9 @@ interface Venue {
 interface VenueSection { id: string; name: string; slug: string; section_type: string; capacity: number; }
 
 interface VenueSeatWizard { id: string; venue_id: string; section: string; row_label: string; seat_number: number; }
-interface RowGroup { label: string; section: string; seatCount: number; seatIds: string[]; }
+interface RowGroup { label: string; section: string; seatCount: number; seatIds: string[]; minSeat: number; maxSeat: number; }
+interface RowSplit { from: number; to: number; zoneIdx: number; }
+type RowAssignment = number | { splits: RowSplit[] };
 
 interface ZoneForm {
   zone_name: string; zone_type: 'ga' | 'reserved'; price: number; original_price: number;
@@ -118,7 +120,7 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
   // Seat Mapper (Mapeo step)
   const [venueSeats, setVenueSeats] = useState<VenueSeatWizard[]>([]);
   const [seatsLoading, setSeatsLoading] = useState(false);
-  const [seatAssignments, setSeatAssignments] = useState<Map<string, number>>(new Map()); // rowKey → zone index
+  const [seatAssignments, setSeatAssignments] = useState<Map<string, RowAssignment>>(new Map()); // rowKey → zone index or splits
   const [activeMapZone, setActiveMapZone] = useState(0);
 
   // Organizer & Commission
@@ -171,11 +173,13 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
     for (const seat of seats) {
       const key = rowKeyW(seat.section, seat.row_label);
       if (!rowMap.has(key)) {
-        rowMap.set(key, { label: seat.row_label, section: seat.section, seatCount: 0, seatIds: [] });
+        rowMap.set(key, { label: seat.row_label, section: seat.section, seatCount: 0, seatIds: [], minSeat: seat.seat_number, maxSeat: seat.seat_number });
       }
       const row = rowMap.get(key)!;
       row.seatCount++;
       row.seatIds.push(seat.id);
+      if (seat.seat_number < row.minSeat) row.minSeat = seat.seat_number;
+      if (seat.seat_number > row.maxSeat) row.maxSeat = seat.seat_number;
     }
     return Array.from(rowMap.values()).sort((a, b) => {
       if (a.section !== b.section) return a.section.localeCompare(b.section);
@@ -195,14 +199,20 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
     return map;
   }, [seatRows]);
 
-  // Compute seat counts per zone from assignments
+  // Compute seat counts per zone from assignments (handles whole-row and splits)
   const zoneSeatCounts = useMemo(() => {
     const counts = new Map<number, number>(); // zone index → seat count
     for (const row of seatRows) {
       const key = rowKeyW(row.section, row.label);
-      const zoneIdx = seatAssignments.get(key);
-      if (zoneIdx !== undefined) {
-        counts.set(zoneIdx, (counts.get(zoneIdx) || 0) + row.seatCount);
+      const assignment = seatAssignments.get(key);
+      if (assignment === undefined) continue;
+      if (typeof assignment === 'number') {
+        counts.set(assignment, (counts.get(assignment) || 0) + row.seatCount);
+      } else {
+        for (const split of assignment.splits) {
+          const seatCount = split.to - split.from + 1;
+          counts.set(split.zoneIdx, (counts.get(split.zoneIdx) || 0) + seatCount);
+        }
       }
     }
     return counts;
@@ -211,19 +221,26 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
   const unassignedSeatCount = useMemo(() => {
     return seatRows.reduce((sum, row) => {
       const key = rowKeyW(row.section, row.label);
-      return sum + (seatAssignments.has(key) ? 0 : row.seatCount);
+      const assignment = seatAssignments.get(key);
+      if (assignment === undefined) return sum + row.seatCount;
+      if (typeof assignment === 'number') return sum;
+      // For splits: check coverage
+      const totalCovered = assignment.splits.reduce((s, sp) => s + (sp.to - sp.from + 1), 0);
+      return sum + Math.max(0, row.seatCount - totalCovered);
     }, 0);
   }, [seatRows, seatAssignments]);
 
-  // Toggle row assignment
+  // Toggle row assignment (whole-row only — split rows use separate handlers)
   const toggleRowAssignment = useCallback((row: RowGroup) => {
     const key = rowKeyW(row.section, row.label);
     setSeatAssignments(prev => {
       const next = new Map(prev);
-      // If already assigned to this zone index, unassign
       const activeIdx = reservedZoneIndices[activeMapZone]?.index;
       if (activeIdx === undefined) return prev;
-      if (next.get(key) === activeIdx) {
+      const current = next.get(key);
+      // Don't toggle if row is in split mode — user must undo split first
+      if (current !== undefined && typeof current !== 'number') return prev;
+      if (current === activeIdx) {
         next.delete(key);
       } else {
         next.set(key, activeIdx);
@@ -231,6 +248,93 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
       return next;
     });
   }, [activeMapZone, reservedZoneIndices]);
+
+  // Enter split mode for a row
+  const enterSplitMode = useCallback((row: RowGroup) => {
+    const key = rowKeyW(row.section, row.label);
+    const activeIdx = reservedZoneIndices[activeMapZone]?.index ?? 0;
+    setSeatAssignments(prev => {
+      const next = new Map(prev);
+      // Default: one split covering all seats in this zone
+      next.set(key, { splits: [{ from: row.minSeat, to: row.maxSeat, zoneIdx: activeIdx }] });
+      return next;
+    });
+  }, [activeMapZone, reservedZoneIndices]);
+
+  // Exit split mode (revert to unassigned)
+  const exitSplitMode = useCallback((row: RowGroup) => {
+    const key = rowKeyW(row.section, row.label);
+    setSeatAssignments(prev => {
+      const next = new Map(prev);
+      next.delete(key);
+      return next;
+    });
+  }, []);
+
+  // Add a split point (divide largest range in half)
+  const addSplitPoint = useCallback((row: RowGroup) => {
+    const key = rowKeyW(row.section, row.label);
+    const activeIdx = reservedZoneIndices[activeMapZone]?.index ?? 0;
+    setSeatAssignments(prev => {
+      const next = new Map(prev);
+      const assignment = next.get(key);
+      if (!assignment || typeof assignment === 'number') return prev;
+      const splits = [...assignment.splits];
+      // Find largest range
+      let largestIdx = 0;
+      let largestSize = 0;
+      splits.forEach((sp, i) => {
+        const size = sp.to - sp.from + 1;
+        if (size > largestSize) { largestSize = size; largestIdx = i; }
+      });
+      if (largestSize < 2) return prev; // Can't split a 1-seat range
+      const sp = splits[largestIdx];
+      const mid = Math.floor((sp.from + sp.to) / 2);
+      const newSplits = [
+        ...splits.slice(0, largestIdx),
+        { from: sp.from, to: mid, zoneIdx: sp.zoneIdx },
+        { from: mid + 1, to: sp.to, zoneIdx: activeIdx },
+        ...splits.slice(largestIdx + 1),
+      ];
+      next.set(key, { splits: newSplits });
+      return next;
+    });
+  }, [activeMapZone, reservedZoneIndices]);
+
+  // Remove a split range by index (merges with previous range)
+  const removeSplitRange = useCallback((row: RowGroup, splitIdx: number) => {
+    const key = rowKeyW(row.section, row.label);
+    setSeatAssignments(prev => {
+      const next = new Map(prev);
+      const assignment = next.get(key);
+      if (!assignment || typeof assignment === 'number') return prev;
+      const splits = [...assignment.splits];
+      if (splits.length <= 1) return prev; // Can't remove last range
+      // Merge with adjacent range (prefer previous, fallback to next)
+      const mergeIdx = splitIdx > 0 ? splitIdx - 1 : 0;
+      const mergeWith = splitIdx > 0 ? splits[splitIdx - 1] : splits[splitIdx + 1];
+      const current = splits[splitIdx];
+      const merged = { from: Math.min(mergeWith.from, current.from), to: Math.max(mergeWith.to, current.to), zoneIdx: mergeWith.zoneIdx };
+      const targetIdx = splitIdx > 0 ? splitIdx - 1 : splitIdx + 1;
+      const newSplits = splits.filter((_, i) => i !== splitIdx && i !== targetIdx);
+      newSplits.splice(Math.min(splitIdx, targetIdx), 0, merged);
+      next.set(key, { splits: newSplits.sort((a, b) => a.from - b.from) });
+      return next;
+    });
+  }, []);
+
+  // Update zone for a specific split range
+  const updateSplitZone = useCallback((row: RowGroup, splitIdx: number, zoneIdx: number) => {
+    const key = rowKeyW(row.section, row.label);
+    setSeatAssignments(prev => {
+      const next = new Map(prev);
+      const assignment = next.get(key);
+      if (!assignment || typeof assignment === 'number') return prev;
+      const splits = assignment.splits.map((sp, i) => i === splitIdx ? { ...sp, zoneIdx } : sp);
+      next.set(key, { splits });
+      return next;
+    });
+  }, []);
 
   // Auto-update zone capacities when seat assignments change
   useEffect(() => {
@@ -277,7 +381,7 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
       .then(setVenueSections)
       .catch(() => setVenueSections([]));
     // Reset seat mapper state on venue change
-    setVenueSeats([]); setSeatAssignments(new Map()); setActiveMapZone(0);
+    setVenueSeats([]); setSeatAssignments(new Map<string, RowAssignment>()); setActiveMapZone(0);
   }, [ev.venue_id]);
 
   // ─── Auto-slug from name + venue ───
@@ -438,7 +542,7 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
         })),
         commission_rate: commRate / 100,
         venue_timezone: selVenue?.timezone || 'America/Mexico_City',
-        // Seat assignments for reserved zones (rowKey → zone index)
+        // Seat assignments for reserved zones (rowKey → zone index or splits)
         ...(hasReservedZones && seatAssignments.size > 0 ? {
           seat_assignments: Object.fromEntries(seatAssignments),
         } : {}),
@@ -819,43 +923,111 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
                               </div>
                               {secRows.map(row => {
                                 const key = rowKeyW(row.section, row.label);
-                                const assignedZoneIdx = seatAssignments.get(key);
-                                const assignedZone = assignedZoneIdx !== undefined ? zones[assignedZoneIdx] : null;
+                                const assignment = seatAssignments.get(key);
+                                const isSplit = assignment !== undefined && typeof assignment !== 'number';
+                                const wholeZoneIdx = typeof assignment === 'number' ? assignment : undefined;
+                                const wholeZone = wholeZoneIdx !== undefined ? zones[wholeZoneIdx] : null;
                                 const activeIdx = reservedZoneIndices[activeMapZone]?.index;
-                                const isAssignedToActive = assignedZoneIdx === activeIdx;
+                                const isAssignedToActive = wholeZoneIdx === activeIdx;
 
+                                if (isSplit && typeof assignment !== 'number') {
+                                  // ── SPLIT MODE ──
+                                  return (
+                                    <div key={key} className="border-b border-gray-800/30 bg-[#0f0f0f]">
+                                      {/* Split header */}
+                                      <div className="px-4 py-2.5 flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                          <div className="w-5 h-5 rounded border-2 border-purple-500 bg-purple-500/20 flex items-center justify-center text-[10px] text-purple-400">~</div>
+                                          <span className="text-sm text-white font-mono font-bold">Fila {row.label}</span>
+                                          <span className="text-xs text-purple-400">{row.seatCount} asientos · dividida</span>
+                                        </div>
+                                        <button
+                                          onClick={() => exitSplitMode(row)}
+                                          className="text-xs text-gray-500 hover:text-gray-200 transition-colors px-2 py-1 rounded"
+                                          title="Deshacer división"
+                                        >↩️ deshacer</button>
+                                      </div>
+                                      {/* Split ranges */}
+                                      <div className="px-4 pb-2 space-y-1.5">
+                                        {assignment.splits.map((sp, spIdx) => {
+                                          const spZone = zones[sp.zoneIdx];
+                                          return (
+                                            <div key={spIdx} className="flex items-center gap-2 text-xs">
+                                              <span className="text-gray-500 w-28 flex-shrink-0">
+                                                Asientos {sp.from}–{sp.to}
+                                              </span>
+                                              <span className="text-gray-600">({sp.to - sp.from + 1} asientos)</span>
+                                              <select
+                                                className="flex-1 rounded border border-gray-700 bg-[#1a1a1a] px-2 py-1 text-xs text-white focus:border-[#EF4444] focus:outline-none"
+                                                value={sp.zoneIdx}
+                                                onChange={e => updateSplitZone(row, spIdx, Number(e.target.value))}
+                                              >
+                                                {reservedZoneIndices.map(({ zone, index }) => (
+                                                  <option key={index} value={index}>{zone.zone_name}</option>
+                                                ))}
+                                              </select>
+                                              {spZone && (
+                                                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: spZone.color }} />
+                                              )}
+                                              {assignment.splits.length > 1 && (
+                                                <button
+                                                  onClick={() => removeSplitRange(row, spIdx)}
+                                                  className="text-gray-600 hover:text-red-400 transition-colors ml-1"
+                                                  title="Eliminar este rango"
+                                                >✕</button>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                        <button
+                                          onClick={() => addSplitPoint(row)}
+                                          className="text-xs text-gray-500 hover:text-white transition-colors mt-1"
+                                        >+ Agregar división</button>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+
+                                // ── WHOLE ROW MODE ──
                                 return (
-                                  <button
+                                  <div
                                     key={key}
-                                    onClick={() => toggleRowAssignment(row)}
-                                    className={`w-full text-left px-4 py-2.5 flex items-center justify-between border-b border-gray-800/30 transition-all hover:bg-[#1a1a1a] ${
-                                      isAssignedToActive ? 'bg-[#1a1a1a]' : ''
-                                    }`}
+                                    className={`group flex items-center justify-between border-b border-gray-800/30 transition-all hover:bg-[#1a1a1a] ${isAssignedToActive ? 'bg-[#1a1a1a]' : ''}`}
                                   >
-                                    <div className="flex items-center gap-3">
+                                    <button
+                                      onClick={() => toggleRowAssignment(row)}
+                                      className="flex-1 text-left px-4 py-2.5 flex items-center gap-3"
+                                    >
                                       <div
-                                        className="w-5 h-5 rounded border-2 flex items-center justify-center text-[10px] transition-all"
+                                        className="w-5 h-5 rounded border-2 flex items-center justify-center text-[10px] transition-all flex-shrink-0"
                                         style={{
-                                          borderColor: assignedZone?.color || '#555',
-                                          backgroundColor: assignedZone ? assignedZone.color + '30' : 'transparent',
+                                          borderColor: wholeZone?.color || '#555',
+                                          backgroundColor: wholeZone ? wholeZone.color + '30' : 'transparent',
                                         }}
                                       >
-                                        {assignedZone && '✓'}
+                                        {wholeZone && '✓'}
                                       </div>
                                       <span className="text-sm text-white font-mono font-bold">Fila {row.label}</span>
                                       <span className="text-xs text-gray-500">{row.seatCount} asientos</span>
+                                    </button>
+                                    <div className="flex items-center gap-2 pr-3">
+                                      {wholeZone ? (
+                                        <span className="text-xs px-2 py-0.5 rounded-full" style={{
+                                          backgroundColor: wholeZone.color + '20',
+                                          color: wholeZone.color,
+                                        }}>
+                                          {wholeZone.zone_name}
+                                        </span>
+                                      ) : (
+                                        <span className="text-xs text-gray-600">sin asignar</span>
+                                      )}
+                                      <button
+                                        onClick={e => { e.stopPropagation(); enterSplitMode(row); }}
+                                        className="text-gray-600 hover:text-gray-200 transition-colors opacity-0 group-hover:opacity-100 text-sm px-1"
+                                        title="Dividir fila por rangos"
+                                      >✂️</button>
                                     </div>
-                                    {assignedZone ? (
-                                      <span className="text-xs px-2 py-0.5 rounded-full" style={{
-                                        backgroundColor: assignedZone.color + '20',
-                                        color: assignedZone.color,
-                                      }}>
-                                        {assignedZone.zone_name}
-                                      </span>
-                                    ) : (
-                                      <span className="text-xs text-gray-600">sin asignar</span>
-                                    )}
-                                  </button>
+                                  </div>
                                 );
                               })}
                             </div>
