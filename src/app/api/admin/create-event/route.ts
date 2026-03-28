@@ -268,14 +268,27 @@ export async function POST(req: NextRequest) {
         );
         const venueSecs: { id: string; slug: string }[] = vSecRes.ok ? await vSecRes.json() : [];
         const slugToVenueSectionId = new Map<string, string>(venueSecs.map(vs => [vs.slug, vs.id]));
+        console.log('[create-event] venue_sections for venue:', JSON.stringify(venueSecs));
 
-        // Get all reserved zones' venue_section_ids
+        // Get all reserved zones' venue_section_ids (from explicit zone config OR derived from seat_assignments keys)
         const reservedSectionIds = new Set<string>();
         input.zones.forEach(z => {
           if (z.zone_type === 'reserved' && z.venue_section_ids) {
             z.venue_section_ids.forEach(sid => reservedSectionIds.add(sid));
           }
         });
+
+        // If no explicit venue_section_ids on reserved zones, derive from seat_assignments keys
+        // Keys are "sectionSlug::rowLabel" — extract unique section slugs and resolve to IDs
+        if (reservedSectionIds.size === 0) {
+          console.log('[create-event] No explicit venue_section_ids on reserved zones — deriving from seat_assignments keys');
+          for (const key of Object.keys(input.seat_assignments!)) {
+            const sectionSlug = key.split('::')[0];
+            const venueSectionId = slugToVenueSectionId.get(sectionSlug);
+            if (venueSectionId) reservedSectionIds.add(venueSectionId);
+          }
+          console.log('[create-event] Derived reservedSectionIds:', Array.from(reservedSectionIds));
+        }
 
         // Create event_sections for each venue_section
         const eventSectionMap = new Map<string, string>(); // venue_section_id → event_section.id
