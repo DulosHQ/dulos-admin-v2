@@ -195,25 +195,39 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
 
   const seatRows = useMemo(() => groupSeatsByRowW(venueSeats), [venueSeats]);
 
-  // Auto-initialize inventory from seatAssignments when Step 4 is done
+  // Rebuild inventory from seatAssignments whenever assignments change
+  // Preserves user edits (enabled/from/to) for rows that haven't changed
   useEffect(() => {
     if (!hasReservedZones || seatAssignments.size === 0 || seatRows.length === 0) return;
-    const inv = new Map<string, InventoryRow>();
-    for (const row of seatRows) {
-      const key = rowKeyW(row.section, row.label);
-      const assignment = seatAssignments.get(key);
-      if (assignment === undefined) continue;
-      if (typeof assignment === 'number') {
-        inv.set(`${row.section}:${row.label}`, { enabled: true, from: 1, to: row.seatCount, max: row.seatCount, section: row.section, label: row.label, zoneIdx: assignment });
-      } else if (assignment && typeof assignment === 'object' && 'splits' in assignment) {
-        for (const split of (assignment as { splits: { from: number; to: number; zoneIdx: number }[] }).splits) {
-          const splitKey = `${row.section}:${row.label}:${split.from}-${split.to}`;
-          const count = split.to - split.from + 1;
-          inv.set(splitKey, { enabled: true, from: split.from, to: split.to, max: count, section: row.section, label: row.label, zoneIdx: split.zoneIdx });
+    setInventorySelections(prev => {
+      const inv = new Map<string, InventoryRow>();
+      for (const row of seatRows) {
+        const key = rowKeyW(row.section, row.label);
+        const assignment = seatAssignments.get(key);
+        if (assignment === undefined) continue;
+        if (typeof assignment === 'number') {
+          const invKey = `${row.section}:${row.label}`;
+          const existing = prev.get(invKey);
+          if (existing && existing.zoneIdx === assignment) {
+            inv.set(invKey, existing); // preserve user edits
+          } else {
+            inv.set(invKey, { enabled: true, from: 1, to: row.seatCount, max: row.seatCount, section: row.section, label: row.label, zoneIdx: assignment });
+          }
+        } else if (assignment && typeof assignment === 'object' && 'splits' in assignment) {
+          for (const split of (assignment as { splits: { from: number; to: number; zoneIdx: number }[] }).splits) {
+            const splitKey = `${row.section}:${row.label}:${split.from}-${split.to}`;
+            const count = split.to - split.from + 1;
+            const existing = prev.get(splitKey);
+            if (existing && existing.zoneIdx === split.zoneIdx) {
+              inv.set(splitKey, existing);
+            } else {
+              inv.set(splitKey, { enabled: true, from: split.from, to: split.to, max: count, section: row.section, label: row.label, zoneIdx: split.zoneIdx });
+            }
+          }
         }
       }
-    }
-    setInventorySelections(prev => prev.size > 0 ? prev : inv);
+      return inv;
+    });
   }, [hasReservedZones, seatAssignments, seatRows]);
 
   // Group rows by section for display
