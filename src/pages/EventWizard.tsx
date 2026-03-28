@@ -8,7 +8,8 @@ const CATEGORIES = ['teatro', 'concierto', 'festival', 'standup', 'comedia', 'mu
 const ZONE_COLORS = ['#E63946', '#2A7AE8', '#E88D2A', '#10B981', '#8B5CF6', '#EC4899', '#F59E0B', '#06B6D4'];
 const DAYS_ES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const STEP_LABELS_5 = ['Info', 'Fechas', 'Zonas', 'Organizador', 'Revisión'];
-const STEP_LABELS_6 = ['Info', 'Fechas', 'Zonas', 'Mapeo', 'Organizador', 'Revisión'];
+const STEP_LABELS_6 = ['Info', 'Fechas', 'Zonas', 'Mapeo', 'Organizador', 'Revisión']; // legacy — unused
+const STEP_LABELS_7 = ['Info', 'Fechas', 'Zonas', 'Mapeo', 'Inventario', 'Organizador', 'Revisión'];
 const fmt = (n: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(n);
 const fmtDateDay = (d: string) => {
   if (!d) return '—';
@@ -123,6 +124,10 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
   const [seatAssignments, setSeatAssignments] = useState<Map<string, RowAssignment>>(new Map()); // rowKey → zone index or splits
   const [activeMapZone, setActiveMapZone] = useState(0);
 
+  // Inventory (Step 5) — which seats within each zone Dulos actually sells
+  type InventoryRow = { enabled: boolean; from: number; to: number; max: number; section: string; label: string; zoneIdx: number };
+  const [inventorySelections, setInventorySelections] = useState<Map<string, InventoryRow>>(new Map());
+
   // Organizer & Commission
   const [orgName, setOrgName] = useState('');
   const [orgPhone, setOrgPhone] = useState('5573933510');
@@ -143,7 +148,7 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
 
   // ─── Dynamic steps ───
   const hasReservedZones = useMemo(() => zones.some(z => z.zone_type === 'reserved'), [zones]);
-  const stepLabels = useMemo(() => hasReservedZones ? STEP_LABELS_6 : STEP_LABELS_5, [hasReservedZones]);
+  const stepLabels = useMemo(() => hasReservedZones ? STEP_LABELS_7 : STEP_LABELS_5, [hasReservedZones]);
   const totalSteps = stepLabels.length;
   // Map logical step names to step numbers
   const stepMap = useMemo(() => {
@@ -155,8 +160,9 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
   const STEP_FECHAS = 2;
   const STEP_ZONAS = 3;
   const stepMapeo = hasReservedZones ? 4 : -1;
-  const stepOrganizador = hasReservedZones ? 5 : 4;
-  const stepRevision = hasReservedZones ? 6 : 5;
+  const stepInventario = hasReservedZones ? 5 : -1;
+  const stepOrganizador = hasReservedZones ? 6 : 4;
+  const stepRevision = hasReservedZones ? 7 : 5;
 
   // ─── Seat mapper helpers ───
   const reservedZoneIndices = useMemo(() =>
@@ -188,6 +194,27 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
   }
 
   const seatRows = useMemo(() => groupSeatsByRowW(venueSeats), [venueSeats]);
+
+  // Auto-initialize inventory from seatAssignments when Step 4 is done
+  useEffect(() => {
+    if (!hasReservedZones || seatAssignments.size === 0 || seatRows.length === 0) return;
+    const inv = new Map<string, InventoryRow>();
+    for (const row of seatRows) {
+      const key = rowKeyW(row.section, row.label);
+      const assignment = seatAssignments.get(key);
+      if (assignment === undefined) continue;
+      if (typeof assignment === 'number') {
+        inv.set(`${row.section}:${row.label}`, { enabled: true, from: 1, to: row.seatCount, max: row.seatCount, section: row.section, label: row.label, zoneIdx: assignment });
+      } else if (assignment && typeof assignment === 'object' && 'splits' in assignment) {
+        for (const split of (assignment as { splits: { from: number; to: number; zoneIdx: number }[] }).splits) {
+          const splitKey = `${row.section}:${row.label}:${split.from}-${split.to}`;
+          const count = split.to - split.from + 1;
+          inv.set(splitKey, { enabled: true, from: split.from, to: split.to, max: count, section: row.section, label: row.label, zoneIdx: split.zoneIdx });
+        }
+      }
+    }
+    setInventorySelections(prev => prev.size > 0 ? prev : inv);
+  }, [hasReservedZones, seatAssignments, seatRows]);
 
   // Group rows by section for display
   const seatRowsBySection = useMemo(() => {
@@ -567,6 +594,7 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
       && (z.zone_type === 'reserved' || venueSections.length === 0 || z.venue_section_ids.length > 0) // GA requires section when venue has them; reserved skips (capacity from mapeo)
     );
     if (step === stepMapeo) return seatRows.length > 0; // Unassigned seats = not for sale, not a blocker
+    if (step === stepInventario) return true; // Always valid — default is everything for sale
     if (step === stepOrganizador) return !!(orgName && orgPhone && orgEmail);
     return true;
   }
@@ -631,6 +659,15 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
         // Seat assignments for reserved zones (rowKey → zone index or splits)
         ...(hasReservedZones && seatAssignments.size > 0 ? {
           seat_assignments: Object.fromEntries(seatAssignments),
+        } : {}),
+        // Inventory selections (which seats within zones Dulos actually sells)
+        ...(hasReservedZones && inventorySelections.size > 0 ? {
+          inventory_selections: Object.fromEntries(
+            Array.from(inventorySelections.entries()).map(([key, val]) => [key, {
+              enabled: val.enabled, from: val.from, to: val.to, max: val.max,
+              section: val.section, label: val.label, zoneIdx: val.zoneIdx,
+            }])
+          ),
         } : {}),
       };
 
@@ -1134,6 +1171,109 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
             </div>
           )}
 
+          {/* ═══ STEP 5: INVENTARIO (select which seats Dulos sells per zone) ═══ */}
+          {step === stepInventario && stepInventario > 0 && (() => {
+            // Group inventory rows by zone
+            const zoneGroups: Record<number, { zone: typeof zones[0]; rows: { key: string; inv: InventoryRow }[] }> = {};
+            for (const [key, inv] of inventorySelections) {
+              if (!zoneGroups[inv.zoneIdx]) {
+                zoneGroups[inv.zoneIdx] = { zone: zones[inv.zoneIdx], rows: [] };
+              }
+              zoneGroups[inv.zoneIdx].rows.push({ key, inv });
+            }
+            // Sort rows within each zone by label
+            for (const g of Object.values(zoneGroups)) {
+              g.rows.sort((a, b) => a.inv.label.localeCompare(b.inv.label, undefined, { numeric: true }));
+            }
+
+            return (
+              <div className="space-y-4">
+                <div className="text-xs text-gray-500 bg-gray-900/50 rounded-lg px-3 py-2 border border-gray-800">
+                  Selecciona qué asientos de cada zona Dulos va a vender. Si no cambias nada, todos los asientos mapeados estarán a la venta.
+                </div>
+                {Object.entries(zoneGroups).map(([zoneIdxStr, group]) => {
+                  const totalMapped = group.rows.reduce((s, r) => s + r.inv.max, 0);
+                  const totalForSale = group.rows.reduce((s, r) => {
+                    if (!r.inv.enabled) return s;
+                    return s + (r.inv.to - r.inv.from + 1);
+                  }, 0);
+                  return (
+                    <div key={zoneIdxStr} className={cardCls}>
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: group.zone?.color || '#555' }} />
+                        <h3 className="text-sm font-semibold text-white">{group.zone?.zone_name || 'Zona'}</h3>
+                        <span className="text-xs text-gray-400">{fmt(group.zone?.price || 0)}</span>
+                        <span className="ml-auto text-xs font-medium" style={{ color: group.zone?.color || '#EF4444' }}>
+                          {totalForSale} de {totalMapped} a la venta
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        {group.rows.map(({ key, inv }) => {
+                          const isSplit = key.includes(':') && key.split(':').length === 3;
+                          const rangeLabel = isSplit ? ` (asientos ${inv.from}–${inv.to})` : '';
+                          return (
+                            <div key={key} className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-all ${inv.enabled ? 'border-gray-700 bg-[#0d0d0d]' : 'border-gray-800/50 bg-transparent opacity-50'}`}>
+                              <label className="flex items-center gap-2 cursor-pointer flex-shrink-0">
+                                <input
+                                  type="checkbox"
+                                  checked={inv.enabled}
+                                  onChange={() => {
+                                    const next = new Map(inventorySelections);
+                                    const cur = next.get(key)!;
+                                    next.set(key, { ...cur, enabled: !cur.enabled });
+                                    setInventorySelections(next);
+                                  }}
+                                  className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-[#EF4444] focus:ring-[#EF4444]"
+                                />
+                                <span className="text-sm text-white font-medium">Fila {inv.label}{rangeLabel}</span>
+                              </label>
+                              {inv.enabled && (
+                                <div className="flex items-center gap-1 ml-auto text-xs">
+                                  <span className="text-gray-500">Asientos</span>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={inv.max}
+                                    value={inv.from}
+                                    onChange={(e) => {
+                                      const v = Math.max(1, Math.min(inv.to, parseInt(e.target.value) || 1));
+                                      const next = new Map(inventorySelections);
+                                      next.set(key, { ...next.get(key)!, from: v });
+                                      setInventorySelections(next);
+                                    }}
+                                    className="w-12 px-1 py-0.5 rounded bg-gray-800 border border-gray-700 text-white text-center text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  />
+                                  <span className="text-gray-500">a</span>
+                                  <input
+                                    type="number"
+                                    min={inv.from}
+                                    max={inv.max}
+                                    value={inv.to}
+                                    onChange={(e) => {
+                                      const v = Math.max(inv.from, Math.min(inv.max, parseInt(e.target.value) || inv.max));
+                                      const next = new Map(inventorySelections);
+                                      next.set(key, { ...next.get(key)!, to: v });
+                                      setInventorySelections(next);
+                                    }}
+                                    className="w-12 px-1 py-0.5 rounded bg-gray-800 border border-gray-700 text-white text-center text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  />
+                                  <span className="text-gray-500">de {inv.max}</span>
+                                </div>
+                              )}
+                              {!inv.enabled && (
+                                <span className="ml-auto text-xs text-gray-600">No a la venta</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
           {/* ═══ STEP: ORGANIZADOR ═══ */}
           {step === stepOrganizador && (
             <div className="space-y-4">
@@ -1261,7 +1401,16 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
                     }
                     // Simpler: use zoneSeatCounts which already sums correctly
                     const totalAssigned = Array.from(zoneSeatCounts.values()).reduce((s, c) => s + c, 0);
-                    return <p>✓ {totalAssigned} asientos a la venta en {seatAssignments.size} filas</p>;
+                    const totalForSale = Array.from(inventorySelections.values()).reduce((s, inv) => {
+                      if (!inv.enabled) return s;
+                      return s + (inv.to - inv.from + 1);
+                    }, 0);
+                    return (
+                      <>
+                        <p>✓ {totalAssigned} asientos mapeados en {seatAssignments.size} filas</p>
+                        <p>✓ {totalForSale || totalAssigned} asientos a la venta (inventario)</p>
+                      </>
+                    );
                   })()}
                   <p>✓ Comisión: {commRate}%</p>
                 </div>

@@ -81,6 +81,7 @@ interface EventInput {
   commission_rate: number;
   venue_timezone: string;
   seat_assignments?: Record<string, number | { splits: { from: number; to: number; zoneIdx: number }[] }>; // rowKey → whole-row zone index OR splits
+  inventory_selections?: Record<string, { enabled: boolean; from: number; to: number; max: number; section: string; label: string; zoneIdx: number }>;
 }
 
 /* ─── Main ─── */
@@ -363,6 +364,104 @@ export async function POST(req: NextRequest) {
           // Track for rollback
           for (const esId of eventSectionMap.values()) {
             created.push({ table: 'event_section_seats', filter: `event_section_id=eq.${esId}` });
+          }
+        }
+
+        // 5a.5: Apply inventory selections (mark for_sale=false for excluded seats)
+        if (input.inventory_selections && Object.keys(input.inventory_selections).length > 0) {
+          const inv = input.inventory_selections;
+          // Build set of venue_seat_ids that should NOT be for_sale
+          const notForSaleIds: string[] = [];
+          for (const seat of essBatch) {
+            // Find venue_seat info to match against inventory
+            const vs = venueSeats.find((v: any) => v.id === seat.venue_seat_id);
+            if (!vs || vs.seat_number == null) continue;
+            const section = vs.section;
+            const rowLabel = vs.row_label;
+            const seatNum: number = vs.seat_number;
+
+            // Check inventory: try exact key (section:label) and split key (section:label:from-to)
+            let isForSale = true;
+            let foundInv = false;
+
+            // Try split keys first (section:label:from-to)
+            for (const [invKey, invVal] of Object.entries(inv)) {
+              const parts = invKey.split(':');
+              if (parts.length === 3 && parts[0] === section && parts[1] === rowLabel) {
+                // This is a split entry
+                const [invFrom, invTo] = parts[2].split('-').map(Number);
+                if (seatNum >= invFrom && seatNum <= invTo) {
+                  foundInv = true;
+                  if (!invVal.enabled) {
+                    isForSale = false;
+                  } else if (seatNum < invVal.from || seatNum > invVal.to) {
+                    isForSale = false;
+                  }
+                  break;
+                }
+              }
+            }
+
+            // Try whole-row key (section:label)
+            if (!foundInv) {
+              const wholeKey = `${section}:${rowLabel}`;
+              const invEntry = inv[wholeKey];
+              if (invEntry) {
+                foundInv = true;
+                if (!invEntry.enabled) {
+                  isForSale = false;
+                } else if (seatNum < invEntry.from || seatNum > invEntry.to) {
+                  isForSale = false;
+                }
+              }
+            }
+
+            if (!isForSale) {
+              notForSaleIds.push(seat.venue_seat_id);
+            }
+          }
+
+          // Batch UPDATE for_sale=false (chunks of 100)
+          if (notForSaleIds.length > 0) {
+            console.log(`[create-event] Marking ${notForSaleIds.length} seats as not for sale`);
+            for (const esId of eventSectionMap.values()) {
+              for (let i = 0; i < notForSaleIds.length; i += 50) {
+                const chunk = notForSaleIds.slice(i, i + 50);
+                try {
+                  const res = await fetch(
+                    `${SUPABASE_URL}/rest/v1/event_section_seats?event_section_id=eq.${esId}&venue_seat_id=in.(${chunk.join(',')})`,
+                    { method: 'PATCH', headers, body: JSON.stringify({ for_sale: false }) }
+                  );
+                  if (!res.ok) {
+                    console.log(`[create-event] for_sale PATCH warning (${res.status}) — column may not exist yet`);
+                  }
+                } catch (e: any) {
+                  console.log(`[create-event] for_sale PATCH error: ${e.message}`);
+                }
+              }
+            }
+
+            // Update ticket_zones capacity to reflect only for_sale seats
+            for (const z of createdZones) {
+              if (z.zone_type !== 'reserved') continue;
+              const forSaleCount = essBatch.filter(s =>
+                s.zone_id === z.id && !notForSaleIds.includes(s.venue_seat_id)
+              ).length;
+              if (forSaleCount !== z.total_capacity) {
+                console.log(`[create-event] Updating zone ${z.id} capacity: ${z.total_capacity} → ${forSaleCount}`);
+                await fetch(`${SUPABASE_URL}/rest/v1/ticket_zones?id=eq.${z.id}`, {
+                  method: 'PATCH', headers,
+                  body: JSON.stringify({ total_capacity: forSaleCount, available: forSaleCount }),
+                });
+                // Also update schedule_inventory
+                for (const sched of createdSchedules) {
+                  await fetch(`${SUPABASE_URL}/rest/v1/schedule_inventory?schedule_id=eq.${sched.id}&zone_id=eq.${z.id}`, {
+                    method: 'PATCH', headers,
+                    body: JSON.stringify({ total_capacity: forSaleCount, available: forSaleCount }),
+                  });
+                }
+              }
+            }
           }
         }
 
