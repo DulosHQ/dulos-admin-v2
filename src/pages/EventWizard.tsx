@@ -249,16 +249,29 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
     });
   }, [activeMapZone, reservedZoneIndices]);
 
-  // Enter split mode for a row
+  // Enter split mode for a row — auto-assign alternating zones for 2-zone venues
   const enterSplitMode = useCallback((row: RowGroup) => {
     const key = rowKeyW(row.section, row.label);
     const activeIdx = reservedZoneIndices[activeMapZone]?.index ?? 0;
-    setSeatAssignments(prev => {
-      const next = new Map(prev);
-      // Default: one split covering all seats in this zone
-      next.set(key, { splits: [{ from: row.minSeat, to: row.maxSeat, zoneIdx: activeIdx }] });
-      return next;
-    });
+    // For 2 reserved zones: auto-create 2 ranges with alternating zones
+    if (reservedZoneIndices.length === 2) {
+      const otherIdx = reservedZoneIndices.find((_, i) => i !== activeMapZone)?.index ?? activeIdx;
+      const mid = Math.floor((row.minSeat + row.maxSeat) / 2);
+      setSeatAssignments(prev => {
+        const next = new Map(prev);
+        next.set(key, { splits: [
+          { from: row.minSeat, to: mid, zoneIdx: activeIdx },
+          { from: mid + 1, to: row.maxSeat, zoneIdx: otherIdx },
+        ]});
+        return next;
+      });
+    } else {
+      setSeatAssignments(prev => {
+        const next = new Map(prev);
+        next.set(key, { splits: [{ from: row.minSeat, to: row.maxSeat, zoneIdx: activeIdx }] });
+        return next;
+      });
+    }
   }, [activeMapZone, reservedZoneIndices]);
 
   // Exit split mode (revert to unassigned)
@@ -274,7 +287,6 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
   // Add a split point (divide largest range in half)
   const addSplitPoint = useCallback((row: RowGroup) => {
     const key = rowKeyW(row.section, row.label);
-    const activeIdx = reservedZoneIndices[activeMapZone]?.index ?? 0;
     setSeatAssignments(prev => {
       const next = new Map(prev);
       const assignment = next.get(key);
@@ -290,10 +302,17 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
       if (largestSize < 2) return prev; // Can't split a 1-seat range
       const sp = splits[largestIdx];
       const mid = Math.floor((sp.from + sp.to) / 2);
+      // New range gets the "other" zone (for 2-zone: alternate; for 3+: use active)
+      let newZoneIdx = reservedZoneIndices[activeMapZone]?.index ?? 0;
+      if (reservedZoneIndices.length === 2) {
+        // Pick the zone that ISN'T the one in the split being divided
+        const otherZone = reservedZoneIndices.find(rz => rz.index !== sp.zoneIdx);
+        if (otherZone) newZoneIdx = otherZone.index;
+      }
       const newSplits = [
         ...splits.slice(0, largestIdx),
         { from: sp.from, to: mid, zoneIdx: sp.zoneIdx },
-        { from: mid + 1, to: sp.to, zoneIdx: activeIdx },
+        { from: mid + 1, to: sp.to, zoneIdx: newZoneIdx },
         ...splits.slice(largestIdx + 1),
       ];
       next.set(key, { splits: newSplits });
@@ -344,21 +363,14 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
       const assignment = next.get(key);
       if (!assignment || typeof assignment === 'number') return prev;
       const splits = [...assignment.splits];
-      const isLast = splitIdx === splits.length - 1;
-      // Clamp: must be >= from of this range, and <= maxSeat of row (or start of next - 1 if not last)
-      const minTo = splits[splitIdx].from;
-      const maxTo = isLast ? row.maxSeat : row.maxSeat - (splits.length - splitIdx - 1);
-      const clampedTo = Math.max(minTo, Math.min(maxTo, newTo));
+      // Only clamp to row bounds — no artificial intermediate limits
+      const clampedTo = Math.max(splits[splitIdx].from, Math.min(row.maxSeat, newTo));
       splits[splitIdx] = { ...splits[splitIdx], to: clampedTo };
-      // Cascade: adjust start of all subsequent ranges
+      // Cascade: recompute from of each subsequent range, last range always ends at maxSeat
       for (let i = splitIdx + 1; i < splits.length; i++) {
         const newFrom = splits[i - 1].to + 1;
-        const newTo2 = i === splits.length - 1 ? row.maxSeat : Math.max(newFrom, splits[i].to);
-        splits[i] = { ...splits[i], from: newFrom, to: newTo2 };
-      }
-      // Ensure last range always ends at maxSeat
-      if (splits.length > 0) {
-        splits[splits.length - 1] = { ...splits[splits.length - 1], to: row.maxSeat };
+        const newRangeTo = i === splits.length - 1 ? row.maxSeat : Math.max(newFrom, splits[i].to);
+        splits[i] = { ...splits[i], from: newFrom, to: newRangeTo };
       }
       next.set(key, { splits });
       return next;
@@ -981,9 +993,10 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
                                         {assignment.splits.map((sp, spIdx) => {
                                           const spZone = zones[sp.zoneIdx];
                                           const isLastRange = spIdx === assignment.splits.length - 1;
+                                          const show2ZoneLabel = reservedZoneIndices.length <= 2; // no dropdown for 2 zones
                                           return (
                                             <div key={spIdx} className="flex items-center gap-1.5 text-xs">
-                                              {/* From (read-only except first) */}
+                                              {/* From — always read-only */}
                                               <span className="text-gray-500 flex-shrink-0">Asientos</span>
                                               <input
                                                 type="number"
@@ -1007,25 +1020,29 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
                                                   type="number"
                                                   value={sp.to}
                                                   min={sp.from}
-                                                  max={row.maxSeat - (assignment.splits.length - spIdx - 1)}
+                                                  max={row.maxSeat}
                                                   onChange={e => updateSplitTo(row, spIdx, Number(e.target.value))}
                                                   onBlur={e => updateSplitTo(row, spIdx, Number(e.target.value))}
                                                   className={`w-12 rounded border border-[#EF4444]/60 bg-[#1a1a1a] px-1.5 py-1 text-xs text-white text-center focus:border-[#EF4444] focus:outline-none ${noSpinCls}`}
                                                 />
                                               )}
-                                              <span className="text-gray-600 flex-shrink-0">({sp.to - sp.from + 1})</span>
-                                              {/* Zone selector */}
-                                              <select
-                                                className="flex-1 min-w-0 rounded border border-gray-700 bg-[#1a1a1a] px-2 py-1 text-xs text-white focus:border-[#EF4444] focus:outline-none"
-                                                value={sp.zoneIdx}
-                                                onChange={e => updateSplitZone(row, spIdx, Number(e.target.value))}
-                                              >
-                                                {reservedZoneIndices.map(({ zone, index }) => (
-                                                  <option key={index} value={index}>{zone.zone_name}</option>
-                                                ))}
-                                              </select>
-                                              {spZone && (
-                                                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: spZone.color }} />
+                                              <span className="text-gray-600 flex-shrink-0">({Math.max(0, sp.to - sp.from + 1)})</span>
+                                              {/* Zone: label for 2 zones, dropdown for 3+ */}
+                                              {show2ZoneLabel ? (
+                                                <span className="flex items-center gap-1 flex-1">
+                                                  {spZone && <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: spZone.color }} />}
+                                                  <span style={{ color: spZone?.color || '#999' }}>{spZone?.zone_name || '—'}</span>
+                                                </span>
+                                              ) : (
+                                                <select
+                                                  className="flex-1 min-w-0 rounded border border-gray-700 bg-[#1a1a1a] px-2 py-1 text-xs text-white focus:border-[#EF4444] focus:outline-none"
+                                                  value={sp.zoneIdx}
+                                                  onChange={e => updateSplitZone(row, spIdx, Number(e.target.value))}
+                                                >
+                                                  {reservedZoneIndices.map(({ zone, index }) => (
+                                                    <option key={index} value={index}>{zone.zone_name}</option>
+                                                  ))}
+                                                </select>
                                               )}
                                               {assignment.splits.length > 1 && (
                                                 <button
