@@ -220,96 +220,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // 2b. INSERT event_sections + event_section_seats (if seat_assignments provided)
-      if (input.seat_assignments && Object.keys(input.seat_assignments).length > 0) {
-        // Collect unique venue_section_ids from reserved zones
-        const reservedSectionIds = new Set<string>();
-        for (const z of input.zones) {
-          if (z.zone_type === 'reserved' && z.venue_section_ids) {
-            z.venue_section_ids.forEach(sid => reservedSectionIds.add(sid));
-          }
-        }
-
-        // Fetch venue_sections to get their slugs
-        const venueSectionsData = await supaFetch<{ id: string; slug: string }[]>(
-          'venue_sections',
-          `venue_id=eq.${input.venue_id}&select=id,slug`
-        );
-        const sectionIdToSlug = new Map<string, string>();
-        const sectionSlugToId = new Map<string, string>();
-        for (const vs of venueSectionsData) {
-          sectionIdToSlug.set(vs.id, vs.slug);
-          sectionSlugToId.set(vs.slug, vs.id);
-        }
-
-        // Create event_sections for each referenced venue_section
-        const eventSectionMap = new Map<string, string>(); // venue_section_id → event_section_id
-        for (const venueSectionId of reservedSectionIds) {
-          const es = await supaInsert<{ id: string }>('event_sections', {
-            event_id: event.id,
-            venue_section_id: venueSectionId,
-          });
-          eventSectionMap.set(venueSectionId, es.id);
-          created.push({ table: 'event_sections', filter: `id=eq.${es.id}` });
-        }
-
-        // Fetch all venue_seats for the venue (include seat_number for split range matching)
-        const allVenueSeats = await supaFetch<{ id: string; section: string; row_label: string; seat_number: number }[]>(
-          'venue_seats',
-          `venue_id=eq.${input.venue_id}&select=id,section,row_label,seat_number&order=sort_order.asc&limit=5000`
-        );
-
-        // For each seat, determine zone assignment and create event_section_seat
-        const seatInserts: { event_section_id: string; venue_seat_id: string; zone_id: string; status: string }[] = [];
-        for (const seat of allVenueSeats) {
-          const rowKey = `${seat.section}::${seat.row_label}`;
-          const assignment = input.seat_assignments![rowKey];
-          if (assignment === undefined) continue;
-
-          let zoneIndex: number;
-          if (typeof assignment === 'number') {
-            zoneIndex = assignment;
-          } else {
-            // Split mode: find which range this seat falls into
-            const matchingSplit = assignment.splits.find(sp => seat.seat_number >= sp.from && seat.seat_number <= sp.to);
-            if (!matchingSplit) continue;
-            zoneIndex = matchingSplit.zoneIdx;
-          }
-
-          if (zoneIndex < 0 || zoneIndex >= createdZones.length) continue;
-
-          const zoneId = createdZones[zoneIndex].id;
-          const venueSectionId = sectionSlugToId.get(seat.section);
-          if (!venueSectionId) continue;
-          const eventSectionId = eventSectionMap.get(venueSectionId);
-          if (!eventSectionId) continue;
-
-          seatInserts.push({
-            event_section_id: eventSectionId,
-            venue_seat_id: seat.id,
-            zone_id: zoneId,
-            status: 'available',
-          });
-        }
-
-        // Batch insert event_section_seats (chunks of 100)
-        for (let i = 0; i < seatInserts.length; i += 100) {
-          const batch = seatInserts.slice(i, i + 100);
-          const res = await fetch(`${SUPABASE_URL}/rest/v1/event_section_seats`, {
-            method: 'POST', headers, body: JSON.stringify(batch),
-          });
-          if (!res.ok) {
-            const body = await res.text().catch(() => '');
-            throw new Error(`INSERT event_section_seats batch failed (${res.status}): ${body}`);
-          }
-          const inserted = await res.json();
-          if (Array.isArray(inserted)) {
-            for (const row of inserted) {
-              created.push({ table: 'event_section_seats', filter: `id=eq.${row.id}` });
-            }
-          }
-        }
-      }
+      // 2b. (Removed — seat insertion consolidated in Block 5 below)
 
       // 3. INSERT schedules
       const createdSchedules: { id: string }[] = [];
@@ -348,6 +259,7 @@ export async function POST(req: NextRequest) {
 
       // 5. INSERT event_sections + event_section_seats (for reserved zones with seat assignments)
       let totalEventSeats = 0;
+      console.log('[create-event] seat_assignments keys:', input.seat_assignments ? Object.keys(input.seat_assignments).length : 0);
       if (input.seat_assignments && Object.keys(input.seat_assignments).length > 0) {
         // Fetch venue_sections to get slug→id mapping
         const vSecRes = await fetch(
@@ -416,6 +328,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Batch insert event_section_seats (chunks of 100)
+        console.log(`[create-event] event_sections created: ${eventSectionMap.size}, seats to insert: ${essBatch.length}`);
         if (essBatch.length > 0) {
           for (let i = 0; i < essBatch.length; i += 100) {
             const chunk = essBatch.slice(i, i + 100);

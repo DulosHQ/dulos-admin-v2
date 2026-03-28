@@ -8,10 +8,12 @@ import { createClient } from '@supabase/supabase-js';
 
 const PROXY_SECRET = process.env.CRON_SECRET || process.env.META_PROXY_SECRET || 'dulos-meta-proxy-2026';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 export async function POST(request: NextRequest) {
   const secret = request.nextUrl.searchParams.get('secret');
@@ -20,6 +22,8 @@ export async function POST(request: NextRequest) {
   }
 
   const { action, coupon, prefix } = await request.json();
+
+  const supabase = getSupabase();
 
   if (action === 'create') {
     const { data, error } = await supabase.from('coupons').insert(coupon).select().single();
