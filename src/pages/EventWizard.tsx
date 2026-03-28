@@ -523,7 +523,7 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
       z.zone_name && z.price > 0 && (z.zone_type === 'reserved' || z.total_capacity > 0)
       && (venueSections.length === 0 || z.venue_section_ids.length > 0) // require section when venue has sections
     );
-    if (step === stepMapeo) return unassignedSeatCount === 0 && seatRows.length > 0;
+    if (step === stepMapeo) return seatRows.length > 0; // Unassigned seats = not for sale, not a blocker
     if (step === stepOrganizador) return !!(orgName && orgPhone && orgEmail);
     return true;
   }
@@ -929,8 +929,8 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
                         })}
                       </div>
                       {unassignedSeatCount > 0 && (
-                        <div className="mt-3 px-3 py-2 bg-yellow-900/20 border border-yellow-800/30 rounded text-xs text-yellow-400">
-                          ⚠️ {unassignedSeatCount} asientos sin asignar
+                        <div className="mt-3 px-3 py-2 bg-blue-900/20 border border-blue-800/30 rounded text-xs text-blue-400">
+                          ℹ️ {unassignedSeatCount} asientos no estarán a la venta
                         </div>
                       )}
                       {unassignedSeatCount === 0 && seatRows.length > 0 && (
