@@ -515,7 +515,7 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
     if (step === STEP_FECHAS) return schedules.length > 0 && schedules.every(s => s.date && s.start_time);
     if (step === STEP_ZONAS) return zones.length > 0 && zones.every(z =>
       z.zone_name && z.price > 0 && (z.zone_type === 'reserved' || z.total_capacity > 0)
-      && (venueSections.length === 0 || z.venue_section_ids.length > 0) // require section when venue has sections
+      && (z.zone_type === 'reserved' || venueSections.length === 0 || z.venue_section_ids.length > 0) // GA requires section when venue has them; reserved skips (capacity from mapeo)
     );
     if (step === stepMapeo) return seatRows.length > 0; // Unassigned seats = not for sale, not a blocker
     if (step === stepOrganizador) return !!(orgName && orgPhone && orgEmail);
@@ -799,15 +799,14 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
                       </div>
                     )}
                   </div>
-                  {/* ─── Venue Sections Selector ─── */}
-                  {venueSections.length > 0 && (() => {
+                  {/* ─── Venue Sections Selector (GA zones only) ─── */}
+                  {venueSections.length > 0 && z.zone_type === 'ga' && (() => {
                     // Compute which sections are assigned to OTHER zones
                     const assignedByOther = new Map<string, string>();
                     zones.forEach((oz, oi) => {
                       if (oi === i) return;
                       oz.venue_section_ids.forEach(sid => assignedByOther.set(sid, oz.zone_name || `Zona ${oi + 1}`));
                     });
-                    // Show ALL venue sections — they represent physical areas regardless of zone type
                     const matchingSections = venueSections;
                     if (matchingSections.length === 0) return null;
                     return (
@@ -832,7 +831,6 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
                                       const newIds = checked
                                         ? [...x.venue_section_ids, vs.id]
                                         : x.venue_section_ids.filter(id => id !== vs.id);
-                                      // Auto-compute capacity from selected sections
                                       const newCap = newIds.reduce((sum, sid) => {
                                         const sec = venueSections.find(s => s.id === sid);
                                         return sum + (sec?.capacity || 0);
@@ -851,6 +849,12 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
                       </div>
                     );
                   })()}
+                  {/* Reserved zone info — capacity comes from Step 4 mapping */}
+                  {z.zone_type === 'reserved' && (
+                    <div className="mb-3 px-3 py-2 bg-blue-900/10 border border-blue-800/20 rounded text-xs text-blue-400">
+                      ℹ️ La capacidad se define en el paso Mapeo al asignar filas
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div><label className={lblCls}>Precio *</label><input type="number" className={`${inpCls} ${noSpinCls}`} value={z.price || ''} min={0} onChange={e => setZones(zs => zs.map((x, j) => j === i ? { ...x, price: Number(e.target.value) } : x))}/></div>
                     <div><label className={lblCls}>Precio original</label><input type="number" className={`${inpCls} ${noSpinCls}`} value={z.original_price || ''} min={0} placeholder="Tachado" onChange={e => setZones(zs => zs.map((x, j) => j === i ? { ...x, original_price: Number(e.target.value) } : x))}/></div>
@@ -1182,9 +1186,24 @@ export default function EventWizard({ open, onClose, onCreated }: Props) {
                   <p>✓ {zones.length} zona{zones.length > 1 ? 's' : ''} de boletos</p>
                   <p>✓ {schedules.length} fecha{schedules.length > 1 ? 's' : ''}</p>
                   <p>✓ {schedules.length * zones.length} registros de inventario</p>
-                  {hasReservedZones && seatAssignments.size > 0 && (
-                    <p>✓ {venueSeats.length} asientos mapeados en {seatAssignments.size} filas</p>
-                  )}
+                  {hasReservedZones && seatAssignments.size > 0 && (() => {
+                    // Count only assigned seats (not total venue seats)
+                    let assignedSeats = 0;
+                    for (const [, val] of seatAssignments) {
+                      if (typeof val === 'number') {
+                        const row = seatRows.find(r => {
+                          const k = rowKeyW(r.section, r.label);
+                          return seatAssignments.get(k) === val;
+                        });
+                        // Just sum all whole-row seats from seatRows
+                      } else {
+                        assignedSeats += val.splits.reduce((s, sp) => s + (sp.to - sp.from + 1), 0);
+                      }
+                    }
+                    // Simpler: use zoneSeatCounts which already sums correctly
+                    const totalAssigned = Array.from(zoneSeatCounts.values()).reduce((s, c) => s + c, 0);
+                    return <p>✓ {totalAssigned} asientos a la venta en {seatAssignments.size} filas</p>;
+                  })()}
                   <p>✓ Comisión: {commRate}%</p>
                 </div>
               </div>
